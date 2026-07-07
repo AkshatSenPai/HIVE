@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="hive-api.js?v=8"></script>
+<style>
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0}
+  body{background:#000;color:#eef1f6;font-family:'IBM Plex Sans',system-ui,sans-serif;-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+  a{color:#79dcec;text-decoration:none}
+  a:hover{color:#aef0fb;text-decoration:underline}
+  ::-webkit-scrollbar{width:9px;height:9px}
+  ::-webkit-scrollbar-thumb{background:rgba(255,255,255,.09);border-radius:6px}
+  ::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.18)}
+  ::-webkit-scrollbar-track{background:transparent}
+  @keyframes hiveBlink{0%,100%{opacity:1}50%{opacity:.25}}
+  @keyframes hivePulseBar{0%,100%{opacity:.35}50%{opacity:.75}}
+  @keyframes toastIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes modalIn{from{opacity:0;transform:translateY(10px) scale(.98)}to{opacity:1;transform:translateY(0) scale(1)}}
+</style>
+</helmet>
+
+<div style="display:flex;height:100vh;width:100%;overflow:hidden;background:radial-gradient(1150px 860px at 30% -10%,#101218 0%,#080a0e 46%,#020203 100%);position:relative">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside style="width:230px;flex:none;display:flex;flex-direction:column;padding:22px 15px;border-right:1px solid rgba(255,255,255,.06);background:linear-gradient(180deg,rgba(12,14,20,.55),rgba(3,4,6,.2));position:relative;z-index:5">
+    <div style="display:flex;align-items:center;gap:11px;padding:4px 8px 22px">
+      <div style="width:26px;height:29px;clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%);background:linear-gradient(150deg,#eaf6ff,#5ccfe6);box-shadow:0 0 18px rgba(110,210,235,.45)"></div>
+      <div style="font:700 18px/1 'IBM Plex Mono';letter-spacing:.34em;color:#f2f5fa">HIVE</div>
+    </div>
+
+    <nav style="display:flex;flex-direction:column;gap:2px;margin-top:4px">
+      <a href="/" style="display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;font:500 13.5px/1 'IBM Plex Sans';color:rgba(190,200,218,.6)"><span style="width:6px;height:6px;border-radius:50%;background:rgba(140,152,178,.4)"></span>Home</a>
+      <a href="/tasks.html" style="display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;font:500 13.5px/1 'IBM Plex Sans';color:rgba(190,200,218,.6)"><span style="width:6px;height:6px;border-radius:50%;background:rgba(140,152,178,.4)"></span>Tasks</a>
+      <a href="/approvals.html" style="display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;font:500 13.5px/1 'IBM Plex Sans';color:rgba(190,200,218,.6)"><span style="width:6px;height:6px;border-radius:50%;background:rgba(140,152,178,.4)"></span>Approvals
+        <sc-if value="{{ hasPending }}" hint-placeholder-val="{{ false }}"><span style="margin-left:auto;min-width:20px;height:20px;padding:0 6px;display:inline-flex;align-items:center;justify-content:center;border-radius:20px;background:rgba(230,178,62,.15);border:1px solid rgba(230,178,62,.45);color:#e6b23e;font:600 11px/1 'IBM Plex Mono'">{{ pendingCount }}</span></sc-if>
+      </a>
+      <a href="/agents.html" style="display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;font:500 13.5px/1 'IBM Plex Sans';color:rgba(190,200,218,.6)"><span style="width:6px;height:6px;border-radius:50%;background:rgba(140,152,178,.4)"></span>Agents</a>
+      <a href="/workflows.html" style="display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;font:500 13.5px/1 'IBM Plex Sans';color:rgba(190,200,218,.6)"><span style="width:6px;height:6px;border-radius:50%;background:rgba(140,152,178,.4)"></span>Workflows</a>
+      <a href="/memory.html" style="display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;font:600 13.5px/1 'IBM Plex Sans';color:#f2f5fa;background:linear-gradient(90deg,rgba(255,255,255,.10),rgba(255,255,255,.01));border:1px solid rgba(255,255,255,.14);position:relative">
+        <span style="position:absolute;left:0;top:9px;bottom:9px;width:3px;border-radius:3px;background:#eaf1f7;box-shadow:0 0 10px rgba(230,240,250,.8)"></span>
+        <span style="width:6px;height:6px;border-radius:50%;background:#eaf1f7;box-shadow:0 0 8px rgba(230,240,250,.7)"></span>Memory</a>
+      <a href="/digest.html" style="display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;font:500 13.5px/1 'IBM Plex Sans';color:rgba(190,200,218,.6)"><span style="width:6px;height:6px;border-radius:50%;background:rgba(140,152,178,.4)"></span>Digest</a>
+      <a href="/settings.html" style="display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;font:500 13.5px/1 'IBM Plex Sans';color:rgba(190,200,218,.6)"><span style="width:6px;height:6px;border-radius:50%;background:rgba(140,152,178,.4)"></span>Settings</a>
+    </nav>
+
+    <div style="margin-top:auto;display:flex;align-items:center;gap:11px;padding:11px 12px;border-radius:12px;border:1px solid rgba(255,255,255,.07);background:rgba(255,255,255,.02)">
+      <div style="width:32px;height:32px;flex:none;border-radius:9px;background:linear-gradient(150deg,#e9f5ff,#63c9dd);display:flex;align-items:center;justify-content:center;font:700 14px/1 'IBM Plex Mono';color:#08131a">{{ ownerInitial }}</div>
+      <div style="min-width:0">
+        <div style="font:600 13px/1.2 'IBM Plex Sans';color:#f2f5fa;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ ownerName }}</div>
+        <div style="font:500 10px/1.3 'IBM Plex Mono';letter-spacing:.12em;text-transform:uppercase;color:rgba(170,182,204,.5);margin-top:2px">Owner</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <div style="flex:1;min-width:0;display:flex;flex-direction:column;position:relative">
+    <sc-if value="{{ killed }}" hint-placeholder-val="{{ false }}">
+      <div style="position:absolute;inset:0;pointer-events:none;z-index:1;background:radial-gradient(900px 640px at 50% 20%,rgba(242,85,90,.1),transparent 62%);box-shadow:inset 0 0 0 2px rgba(242,85,90,.3)"></div>
+    </sc-if>
+
+    <!-- HEADER -->
+    <header style="flex:none;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:17px 26px;border-bottom:1px solid rgba(255,255,255,.06);position:relative;z-index:4">
+      <div>
+        <div style="font:500 10px/1 'IBM Plex Mono';letter-spacing:.22em;text-transform:uppercase;color:rgba(140,155,185,.55);margin-bottom:7px">HIVE · Operating System</div>
+        <h1 style="margin:0;font:600 23px/1 'IBM Plex Sans';letter-spacing:-.01em;color:#f4f7fb">Memory</h1>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <sc-if value="{{ reconnecting }}" hint-placeholder-val="{{ false }}">
+          <div style="display:flex;align-items:center;gap:7px;padding:7px 11px;border-radius:9px;border:1px solid rgba(230,178,62,.3);background:rgba(230,178,62,.08);font:500 11px/1 'IBM Plex Mono';color:#e6b23e"><span style="width:6px;height:6px;border-radius:50%;background:#e6b23e;animation:hiveBlink 1s infinite"></span>reconnecting…</div>
+        </sc-if>
+        <sc-if value="{{ usingMock }}" hint-placeholder-val="{{ false }}">
+          <div title="No live backend detected — showing sample data" style="display:flex;align-items:center;gap:7px;padding:7px 11px;border-radius:9px;border:1px solid rgba(150,165,195,.2);background:rgba(150,165,195,.05);font:500 10px/1 'IBM Plex Mono';letter-spacing:.08em;color:rgba(185,196,218,.72)"><span style="width:6px;height:6px;border-radius:50%;background:rgba(185,196,218,.6)"></span>SAMPLE DATA</div>
+        </sc-if>
+        <div style="display:flex;align-items:center;gap:8px;padding:7px 12px;border-radius:9px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.03);font:500 12px/1 'IBM Plex Mono';color:rgba(206,216,234,.85)"><span style="width:7px;height:7px;border-radius:50%;background:#34d399;box-shadow:0 0 8px #34d399"></span>{{ adapterName }}</div>
+
+        <button onClick="{{ toggleKill }}" title="Kill switch — pause all agent activity" style="display:flex;align-items:center;gap:12px;padding:7px 8px 7px 14px;border-radius:11px;border:1px solid {{ killBorder }};background:{{ killBg }};cursor:pointer;transition:background .3s,border-color .3s">
+          <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.16em;color:{{ killTextColor }}">KILL SWITCH</span>
+          <span style="position:relative;width:44px;height:24px;border-radius:20px;background:rgba(6,8,12,.8);border:1px solid rgba(255,255,255,.1);flex:none">
+            <span style="position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:{{ knobColor }};transform:translateX({{ knobX }});transition:transform .28s cubic-bezier(.4,1.3,.5,1),background .28s;box-shadow:0 2px 6px rgba(0,0,0,.5)"></span>
+          </span>
+        </button>
+      </div>
+    </header>
+
+    <sc-if value="{{ killed }}" hint-placeholder-val="{{ false }}">
+      <div style="flex:none;display:flex;align-items:center;gap:12px;padding:12px 26px;background:linear-gradient(90deg,rgba(242,85,90,.2),rgba(242,85,90,.04));border-bottom:1px solid rgba(242,85,90,.35);position:relative;z-index:3">
+        <span style="width:9px;height:9px;border-radius:50%;background:#f2555a;box-shadow:0 0 12px #f2555a;animation:hiveBlink 1.1s infinite"></span>
+        <span style="font:600 13px/1 'IBM Plex Mono';letter-spacing:.14em;color:#ff9498">ALL AGENT ACTIVITY PAUSED</span>
+        <span style="font:400 12.5px/1 'IBM Plex Sans';color:rgba(255,190,192,.72)">The vault stays readable — agents just won't write to it until you release the switch.</span>
+      </div>
+    </sc-if>
+
+    <!-- CONTENT: two-pane vault -->
+    <div style="flex:1;min-height:0;display:flex;position:relative;z-index:2">
+
+      <sc-if value="{{ vaultEmpty }}" hint-placeholder-val="{{ false }}">
+        <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px">
+          <div style="font:600 17px/1.3 'IBM Plex Sans';color:#eef2f8;margin-bottom:8px">Vault is empty</div>
+          <div style="font:400 13.5px/1.5 'IBM Plex Sans';color:rgba(170,182,206,.62);max-width:340px">Agents write here as they work — notes, briefs, and client context will appear in this folder.</div>
+        </div>
+      </sc-if>
+
+      <sc-if value="{{ hasVault }}" hint-placeholder-val="{{ true }}">
+        <!-- LEFT: file tree -->
+        <aside style="width:288px;flex:none;display:flex;flex-direction:column;border-right:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.012);min-height:0">
+          <div style="flex:none;padding:15px 16px 13px;border-bottom:1px solid rgba(255,255,255,.06)">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+              <span style="font:600 11px/1 'IBM Plex Mono';letter-spacing:.16em;text-transform:uppercase;color:rgba(188,199,222,.62)">Vault</span>
+              <span style="font:500 10px/1 'IBM Plex Mono';color:rgba(150,164,190,.6)">{{ fileCount }} files</span>
+            </div>
+            <div title="{{ vaultRoot }}" style="margin-top:9px;font:500 10.5px/1.3 'IBM Plex Mono';color:rgba(150,164,190,.6);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;direction:rtl;text-align:left">{{ vaultRoot }}</div>
+          </div>
+
+          <div style="flex:1;min-height:0;overflow-y:auto;padding:10px 8px">
+            <sc-for list="{{ tree }}" as="g" hint-placeholder-count="4">
+              <div style="margin-bottom:6px">
+                <sc-if value="{{ g.hasFolder }}" hint-placeholder-val="{{ true }}">
+                  <button onClick="{{ g.onToggle }}" style="display:flex;align-items:center;gap:8px;width:100%;padding:7px 9px;border:none;background:transparent;cursor:pointer;border-radius:8px;text-align:left" style-hover="background:rgba(255,255,255,.03)">
+                    <span style="display:inline-block;width:8px;font:600 9px/1 'IBM Plex Mono';color:rgba(150,164,190,.7);transform:rotate({{ g.chevron }});transition:transform .18s">▶</span>
+                    <span style="width:15px;height:12px;flex:none;border-radius:2px 3px 3px 3px;background:rgba(121,220,236,.12);border:1px solid rgba(121,220,236,.32);position:relative"></span>
+                    <span style="flex:1;font:600 12.5px/1 'IBM Plex Sans';color:rgba(214,224,240,.86)">{{ g.folder }}</span>
+                    <span style="font:500 10px/1 'IBM Plex Mono';color:rgba(140,152,178,.5)">{{ g.count }}</span>
+                  </button>
+                </sc-if>
+                <sc-if value="{{ g.showFiles }}" hint-placeholder-val="{{ true }}">
+                  <div style="display:flex;flex-direction:column;gap:1px;margin-top:2px">
+                    <sc-for list="{{ g.files }}" as="f" hint-placeholder-count="2">
+                      <button onClick="{{ f.onClick }}" style="display:flex;align-items:center;gap:9px;width:100%;padding:8px 10px;border:none;cursor:pointer;border-radius:8px;text-align:left;background:{{ f.bg }};border-left:2px solid {{ f.accent }};transition:background .15s" style-hover="background:rgba(255,255,255,.04)">
+                        <span style="width:12px;height:14px;flex:none;border-radius:2px;background:{{ f.iconBg }};border:1px solid {{ f.iconBorder }};position:relative;margin-left:{{ f.indent }}"></span>
+                        <span style="flex:1;min-width:0;font:{{ f.font }};color:{{ f.color }};white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ f.name }}</span>
+                      </button>
+                    </sc-for>
+                  </div>
+                </sc-if>
+              </div>
+            </sc-for>
+          </div>
+
+          <div style="flex:none;display:flex;align-items:flex-start;gap:9px;padding:12px 14px;border-top:1px solid rgba(255,255,255,.06);background:rgba(121,220,236,.03)">
+            <span style="margin-top:1px;width:14px;height:14px;flex:none;border-radius:4px;border:1px solid rgba(121,220,236,.4);display:flex;align-items:center;justify-content:center;font:700 9px/1 'IBM Plex Mono';color:#79dcec">i</span>
+            <span style="font:400 11px/1.5 'IBM Plex Sans';color:rgba(175,190,212,.62)">Plain markdown — edit it in Obsidian at <span style="color:rgba(121,220,236,.85);font-family:'IBM Plex Mono';font-size:10.5px">{{ vaultRoot }}</span></span>
+          </div>
+        </aside>
+
+        <!-- RIGHT: document -->
+        <section style="flex:1;min-width:0;display:flex;flex-direction:column;min-height:0">
+          <sc-if value="{{ hasSelection }}" hint-placeholder-val="{{ true }}">
+            <div style="flex:none;display:flex;align-items:center;gap:11px;padding:15px 26px;border-bottom:1px solid rgba(255,255,255,.06)">
+              <div style="flex:1;min-width:0;display:flex;align-items:center;gap:8px">
+                <sc-if value="{{ selFolder }}" hint-placeholder-val="{{ false }}">
+                  <span style="font:500 12px/1 'IBM Plex Mono';color:rgba(150,164,190,.65)">{{ selFolder }}</span>
+                  <span style="font:400 12px/1 'IBM Plex Mono';color:rgba(120,132,158,.5)">/</span>
+                </sc-if>
+                <span style="font:600 14px/1 'IBM Plex Mono';color:#e6ecf6">{{ selName }}</span>
+              </div>
+              <span style="flex:none;padding:3px 9px;border-radius:6px;font:600 9.5px/1.3 'IBM Plex Mono';letter-spacing:.06em;color:rgba(121,220,236,.85);background:rgba(121,220,236,.08);border:1px solid rgba(121,220,236,.28)">MARKDOWN</span>
+            </div>
+
+            <div ref="{{ docScrollRef }}" style="flex:1;min-height:0;overflow-y:auto;padding:32px 40px 60px">
+              <div style="max-width:680px;margin:0 auto">
+                <sc-if value="{{ fileLoading }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;flex-direction:column;gap:14px">
+                    <div style="height:26px;width:52%;border-radius:6px;background:rgba(255,255,255,.06);animation:hivePulseBar 1.4s ease-in-out infinite"></div>
+                    <div style="height:13px;width:96%;border-radius:5px;background:rgba(255,255,255,.045);animation:hivePulseBar 1.4s ease-in-out infinite"></div>
+                    <div style="height:13px;width:88%;border-radius:5px;background:rgba(255,255,255,.045);animation:hivePulseBar 1.4s ease-in-out infinite"></div>
+                    <div style="height:13px;width:92%;border-radius:5px;background:rgba(255,255,255,.045);animation:hivePulseBar 1.4s ease-in-out infinite"></div>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ fileError }}" hint-placeholder-val="{{ false }}">
+                  <div style="display:flex;align-items:flex-start;gap:12px;padding:16px 18px;border-radius:13px;border:1px solid rgba(242,85,90,.3);background:rgba(242,85,90,.06)">
+                    <span style="margin-top:1px;width:18px;height:18px;flex:none;border-radius:50%;border:1.5px solid #f2707a;display:flex;align-items:center;justify-content:center;font:700 11px/1 'IBM Plex Mono';color:#f2707a">!</span>
+                    <div>
+                      <div style="font:600 13.5px/1.3 'IBM Plex Sans';color:#ff9ea3">{{ fileErrorTitle }}</div>
+                      <div style="font:400 12.5px/1.5 'IBM Plex Sans';color:rgba(255,190,192,.7);margin-top:4px">{{ fileErrorDetail }}</div>
+                    </div>
+                  </div>
+                </sc-if>
+                <sc-if value="{{ fileReady }}" hint-placeholder-val="{{ false }}">
+                  <div style="font:400 14px/1.7 'IBM Plex Sans';color:rgba(220,228,242,.88)">{{ docBody }}</div>
+                </sc-if>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{ noSelection }}" hint-placeholder-val="{{ false }}">
+            <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:40px">
+              <div style="width:46px;height:56px;border-radius:6px;border:1px solid rgba(255,255,255,.14);background:rgba(255,255,255,.03);position:relative;margin-bottom:20px">
+                <div style="position:absolute;left:9px;right:9px;top:14px;height:3px;border-radius:2px;background:rgba(255,255,255,.12)"></div>
+                <div style="position:absolute;left:9px;right:16px;top:23px;height:3px;border-radius:2px;background:rgba(255,255,255,.1)"></div>
+                <div style="position:absolute;left:9px;right:12px;top:32px;height:3px;border-radius:2px;background:rgba(255,255,255,.08)"></div>
+              </div>
+              <div style="font:600 15px/1.3 'IBM Plex Sans';color:#dfe6f2">Select a note to read</div>
+              <div style="font:400 13px/1.5 'IBM Plex Sans';color:rgba(160,172,196,.55);margin-top:6px">Pick a file from the vault on the left.</div>
+            </div>
+          </sc-if>
+        </section>
+      </sc-if>
+    </div>
+  </div>
+
+  <!-- TOASTS -->
+  <div style="position:fixed;left:50%;bottom:26px;transform:translateX(-50%);display:flex;flex-direction:column;gap:10px;z-index:70;align-items:center;pointer-events:none">
+    <sc-for list="{{ toasts }}" as="t" hint-placeholder-count="0">
+      <div style="pointer-events:auto;display:flex;align-items:center;gap:13px;min-width:300px;max-width:460px;padding:13px 16px;border-radius:12px;border:1px solid rgba(255,255,255,.1);background:rgba(12,15,20,.93);backdrop-filter:blur(14px);box-shadow:0 18px 50px -20px rgba(0,0,0,.9);animation:toastIn .3s ease-out">
+        <span style="width:4px;align-self:stretch;border-radius:4px;background:{{ t.color }};flex:none"></span>
+        <span style="flex:1;font:500 13px/1.4 'IBM Plex Sans';color:#eef1f6">{{ t.text }}</span>
+      </div>
+    </sc-for>
+  </div>
+
+  <!-- CONFIRM MODAL (kill switch) -->
+  <sc-if value="{{ confirmOpen }}" hint-placeholder-val="{{ false }}">
+    <div style="position:fixed;inset:0;z-index:80;display:flex;align-items:center;justify-content:center;background:rgba(2,3,5,.74);backdrop-filter:blur(6px)">
+      <div style="width:420px;max-width:90vw;border-radius:18px;border:1px solid rgba(255,255,255,.1);background:linear-gradient(180deg,rgba(20,23,29,.98),rgba(10,12,16,.98));box-shadow:0 40px 100px -30px rgba(0,0,0,.9);padding:26px;animation:modalIn .25s ease-out">
+        <div style="display:flex;align-items:center;gap:11px;margin-bottom:14px">
+          <span style="width:10px;height:10px;border-radius:50%;background:{{ confirmYesColor }};box-shadow:0 0 12px {{ confirmYesColor }}"></span>
+          <h2 style="margin:0;font:600 18px/1.2 'IBM Plex Sans';color:#f4f7fb">{{ confirmTitle }}</h2>
+        </div>
+        <p style="margin:0 0 22px;font:400 14px/1.6 'IBM Plex Sans';color:rgba(196,206,228,.72)">{{ confirmBody }}</p>
+        <div style="display:flex;gap:11px;justify-content:flex-end">
+          <button onClick="{{ confirmNo }}" style="padding:11px 18px;border-radius:10px;border:1px solid rgba(255,255,255,.12);background:transparent;color:rgba(212,220,236,.85);font:600 13px/1 'IBM Plex Sans';cursor:pointer">Cancel</button>
+          <button onClick="{{ confirmYes }}" style="padding:11px 18px;border-radius:10px;border:1px solid {{ confirmYesColor }};background:{{ confirmYesBg }};color:{{ confirmYesColor }};font:600 13px/1 'IBM Plex Sans';cursor:pointer">{{ confirmYesText }}</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{
+  &quot;ownerName&quot;: { &quot;editor&quot;: &quot;text&quot;, &quot;default&quot;: &quot;Akshat&quot;, &quot;tsType&quot;: &quot;string&quot;, &quot;section&quot;: &quot;Shell&quot; }
+}">
+class Component extends DCLogic {
+  docScrollRef = React.createRef();
+  state = {
+    ready: false, health: null, killed: false, usingMock: false, reconnecting: false, pendingCount: 0,
+    vaultRoot: '', files: [], collapsed: {},
+    selectedPath: null, fileContent: null, fileLoading: false, fileError: null,
+    toasts: [], confirm: null
+  };
+  _toastSeq = 0;
+  _autoSelected = false;
+
+  componentDidMount() { this.fetchAll(); this._poll = setInterval(this.fetchAll, 4000); }
+  componentWillUnmount() { clearInterval(this._poll); }
+
+  fetchAll = async () => {
+    try {
+      const h = await window.HiveAPI.req('/health');
+      const [ks, ap, vault] = await Promise.all([
+        window.HiveAPI.req('/killswitch'), window.HiveAPI.req('/approvals'), window.HiveAPI.req('/vault')
+      ]);
+      const files = (vault.data && vault.data.files) || [];
+      this.setState({
+        ready: true, health: h.data, killed: !!(ks.data && ks.data.engaged),
+        usingMock: !window.HiveAPI.isLive(), reconnecting: false,
+        pendingCount: ((ap.data && ap.data.cards) || []).length,
+        vaultRoot: (vault.data && vault.data.root) || '', files
+      });
+      if (!this._autoSelected && files.length) { this._autoSelected = true; this.selectFile(files[0], true); }
+      else if (this.state.selectedPath) { this.refreshSelected(); }
+    } catch (e) { this.setState({ reconnecting: true }); }
+  };
+
+  selectFile = async (path, silent) => {
+    this.setState({ selectedPath: path, fileError: null, fileLoading: !silent ? true : this.state.fileLoading });
+    const res = await this._fetchFile(path);
+    this._applyFile(path, res, true);
+  };
+  refreshSelected = async () => {
+    const path = this.state.selectedPath; if (!path) return;
+    const res = await this._fetchFile(path);
+    this._applyFile(path, res, false);
+  };
+  _fetchFile = async (path) => {
+    try { return await window.HiveAPI.req('/vault/file?path=' + encodeURIComponent(path)); }
+    catch (e) { return { ok: false, status: 0 }; }
+  };
+  _applyFile = (path, res, resetScroll) => {
+    if (this.state.selectedPath !== path) return; // a newer selection won
+    if (res.ok && res.data) {
+      this.setState({ fileContent: res.data.content || '', fileLoading: false, fileError: null });
+      if (resetScroll && this.docScrollRef.current) this.docScrollRef.current.scrollTop = 0;
+    } else {
+      const code = res.status;
+      const err = code === 400 ? { title: 'Invalid path', detail: 'That path could not be read.' }
+        : code === 404 ? { title: 'File not found', detail: 'This note is no longer in the vault — it may have been moved or deleted.' }
+        : { title: 'Could not open file', detail: 'The vault did not respond. It will retry on the next refresh.' };
+      this.setState({ fileError: err, fileContent: null, fileLoading: false });
+    }
+  };
+
+  toggleFolder = (folder) => () => this.setState(s => ({ collapsed: Object.assign({}, s.collapsed, { [folder]: !s.collapsed[folder] }) }));
+
+  toggleKill = () => this.setState({ confirm: this.state.killed ? { kind: 'disengage' } : { kind: 'engage' } });
+  confirmNo = () => this.setState({ confirm: null });
+  confirmYes = async () => {
+    const c = this.state.confirm; if (!c) return;
+    const engage = c.kind === 'engage';
+    this.setState({ confirm: null });
+    try { await window.HiveAPI.req('/killswitch', { method: 'POST', body: JSON.stringify({ engaged: engage }) }); } catch (e) {}
+    this.setState({ killed: engage });
+    this.pushToast(engage ? 'Kill switch engaged — all agent activity paused' : 'Kill switch released — agents resuming', engage ? 'red' : 'green');
+    this.fetchAll();
+  };
+  pushToast(text, tone) {
+    const id = ++this._toastSeq;
+    this.setState(s => ({ toasts: [...s.toasts, { id, text, tone }] }));
+    setTimeout(() => this.setState(s => ({ toasts: s.toasts.filter(t => t.id !== id) })), 5200);
+  }
+
+  // ---------------- tiny markdown renderer ----------------
+  _renderInline(text, kp) {
+    const nodes = []; let last = 0, key = 0;
+    const re = /(\*\*([^*]+)\*\*)|(`([^`]+)`)|(\[([^\]]+)\]\(([^)]+)\))|(\*([^*]+)\*)|(_([^_]+)_)/g;
+    let m;
+    while ((m = re.exec(text))) {
+      if (m.index > last) nodes.push(text.slice(last, m.index));
+      if (m[1]) nodes.push(React.createElement('strong', { key: kp + key++, style: { fontWeight: 700, color: '#f4f7fb' } }, m[2]));
+      else if (m[3]) nodes.push(React.createElement('code', { key: kp + key++, style: { fontFamily: "'IBM Plex Mono',monospace", fontSize: '.86em', background: 'rgba(255,255,255,.06)', border: '1px solid rgba(255,255,255,.1)', borderRadius: '5px', padding: '1px 5px', color: '#aef0fb' } }, m[4]));
+      else if (m[5]) nodes.push(React.createElement('a', { key: kp + key++, href: m[7], style: { color: '#79dcec' } }, m[6]));
+      else if (m[8]) nodes.push(React.createElement('em', { key: kp + key++, style: { fontStyle: 'italic', color: 'rgba(232,240,252,.92)' } }, m[9]));
+      else if (m[10]) nodes.push(React.createElement('em', { key: kp + key++, style: { fontStyle: 'italic', color: 'rgba(232,240,252,.92)' } }, m[11]));
+      last = re.lastIndex;
+    }
+    if (last < text.length) nodes.push(text.slice(last));
+    return nodes;
+  }
+  _renderMarkdown(md) {
+    const lines = (md || '').replace(/\r\n/g, '\n').split('\n');
+    const blocks = []; let i = 0, key = 0;
+    const K = () => 'b' + (key++);
+    const isSpecial = (l) => /^\s*(#{1,6}\s+|[-*]\s+|\d+\.\s+|>\s?|```)/.test(l) || /^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(l);
+    while (i < lines.length) {
+      const line = lines[i];
+      if (/^\s*```/.test(line)) {
+        const buf = []; i++;
+        while (i < lines.length && !/^\s*```/.test(lines[i])) { buf.push(lines[i]); i++; }
+        i++;
+        blocks.push(React.createElement('pre', { key: K(), style: { margin: '14px 0', padding: '14px 16px', borderRadius: '10px', background: 'rgba(0,0,0,.4)', border: '1px solid rgba(255,255,255,.08)', overflowX: 'auto', fontFamily: "'IBM Plex Mono',monospace", fontSize: '12.5px', lineHeight: 1.6, color: 'rgba(206,220,238,.9)' } }, buf.join('\n')));
+        continue;
+      }
+      const h = line.match(/^\s*(#{1,6})\s+(.*)$/);
+      if (h) {
+        const lvl = h[1].length, txt = h[2];
+        if (lvl === 1) blocks.push(React.createElement('h1', { key: K(), style: { margin: '2px 0 16px', font: "700 23px/1.3 'IBM Plex Sans'", letterSpacing: '-.01em', color: '#f6f8fc', paddingBottom: '12px', borderBottom: '1px solid rgba(255,255,255,.08)' } }, this._renderInline(txt, K())));
+        else if (lvl === 2) blocks.push(React.createElement('h2', { key: K(), style: { margin: '26px 0 10px', font: "600 16px/1.35 'IBM Plex Sans'", color: '#eaf0f8' } }, this._renderInline(txt, K())));
+        else blocks.push(React.createElement('h3', { key: K(), style: { margin: '20px 0 8px', font: "600 13px/1.4 'IBM Plex Mono'", letterSpacing: '.04em', textTransform: 'uppercase', color: 'rgba(180,194,220,.8)' } }, this._renderInline(txt, K())));
+        i++; continue;
+      }
+      if (/^\s*(-{3,}|\*{3,}|_{3,})\s*$/.test(line)) { blocks.push(React.createElement('div', { key: K(), style: { height: '1px', background: 'rgba(255,255,255,.1)', margin: '22px 0' } })); i++; continue; }
+      if (/^\s*>\s?/.test(line)) {
+        const buf = [];
+        while (i < lines.length && /^\s*>\s?/.test(lines[i])) { buf.push(lines[i].replace(/^\s*>\s?/, '')); i++; }
+        blocks.push(React.createElement('blockquote', { key: K(), style: { margin: '14px 0', padding: '4px 0 4px 16px', borderLeft: '3px solid rgba(121,220,236,.5)', color: 'rgba(198,210,232,.78)', fontStyle: 'italic' } }, this._renderInline(buf.join(' '), K())));
+        continue;
+      }
+      if (/^\s*[-*]\s+/.test(line)) {
+        const items = [];
+        while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) { items.push(lines[i].replace(/^\s*[-*]\s+/, '')); i++; }
+        blocks.push(React.createElement('ul', { key: K(), style: { margin: '10px 0', paddingLeft: '4px', listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '7px' } }, items.map((it, idx) => React.createElement('li', { key: idx, style: { position: 'relative', paddingLeft: '18px', lineHeight: 1.6 } }, React.createElement('span', { style: { position: 'absolute', left: '3px', top: '9px', width: '5px', height: '5px', borderRadius: '50%', background: 'rgba(121,220,236,.7)' } }), this._renderInline(it, 'li' + idx + '-')))));
+        continue;
+      }
+      if (/^\s*\d+\.\s+/.test(line)) {
+        const items = [];
+        while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) { items.push(lines[i].replace(/^\s*\d+\.\s+/, '')); i++; }
+        blocks.push(React.createElement('ol', { key: K(), style: { margin: '10px 0', paddingLeft: '4px', listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '7px', counterReset: 'md' } }, items.map((it, idx) => React.createElement('li', { key: idx, style: { position: 'relative', paddingLeft: '24px', lineHeight: 1.6 } }, React.createElement('span', { style: { position: 'absolute', left: '0', top: '0', font: "600 12px/1.6 'IBM Plex Mono'", color: 'rgba(121,220,236,.8)' } }, (idx + 1) + '.'), this._renderInline(it, 'ol' + idx + '-')))));
+        continue;
+      }
+      if (/^\s*$/.test(line)) { i++; continue; }
+      const buf = [];
+      while (i < lines.length && !/^\s*$/.test(lines[i]) && !isSpecial(lines[i])) { buf.push(lines[i]); i++; }
+      blocks.push(React.createElement('p', { key: K(), style: { margin: '0 0 13px', lineHeight: 1.7 } }, this._renderInline(buf.join(' '), K())));
+    }
+    return React.createElement('div', {}, blocks);
+  }
+
+  _basename(p) { const i = p.lastIndexOf('/'); return i < 0 ? p : p.slice(i + 1); }
+  _folderOf(p) { const i = p.indexOf('/'); return i < 0 ? null : p.slice(0, i); }
+
+  renderVals() {
+    const S = this.state, P = this.props || {};
+    const ownerName = P.ownerName || 'Akshat';
+    const adapterName = (S.health && S.health.adapter) || 'connecting…';
+    const killed = S.killed;
+
+    // ---- build tree grouped by top-level folder ----
+    const rootFiles = [], folders = {}, order = [];
+    S.files.slice().sort().forEach(p => {
+      const f = this._folderOf(p);
+      if (f == null) rootFiles.push(p);
+      else { if (!folders[f]) { folders[f] = []; order.push(f); } folders[f].push(p); }
+    });
+    const mkFile = (p, indented) => ({
+      name: this._basename(p),
+      onClick: () => this.selectFile(p),
+      selected: S.selectedPath === p,
+      bg: S.selectedPath === p ? 'rgba(121,220,236,.1)' : 'transparent',
+      accent: S.selectedPath === p ? '#79dcec' : 'transparent',
+      color: S.selectedPath === p ? '#eaf6fb' : 'rgba(196,206,228,.72)',
+      font: S.selectedPath === p ? "600 12.5px/1.2 'IBM Plex Sans'" : "500 12.5px/1.2 'IBM Plex Sans'",
+      iconBg: S.selectedPath === p ? 'rgba(121,220,236,.16)' : 'rgba(255,255,255,.05)',
+      iconBorder: S.selectedPath === p ? 'rgba(121,220,236,.4)' : 'rgba(255,255,255,.12)',
+      indent: indented ? '12px' : '0px'
+    });
+    const tree = [];
+    if (rootFiles.length) tree.push({ hasFolder: false, showFiles: true, folder: '', count: rootFiles.length, chevron: '90deg', onToggle: () => {}, files: rootFiles.map(p => mkFile(p, false)) });
+    order.forEach(f => {
+      const collapsed = !!S.collapsed[f];
+      tree.push({
+        hasFolder: true, folder: f, count: folders[f].length,
+        collapsed, showFiles: !collapsed, chevron: collapsed ? '0deg' : '90deg',
+        onToggle: this.toggleFolder(f),
+        files: folders[f].map(p => mkFile(p, true))
+      });
+    });
+
+    // ---- selection / document ----
+    const sel = S.selectedPath;
+    const selFolder = sel ? this._folderOf(sel) : null;
+    const fileReady = !!sel && !S.fileLoading && !S.fileError && S.fileContent != null;
+
+    return {
+      ownerName, ownerInitial: (ownerName[0] || 'A').toUpperCase(),
+      adapterName, usingMock: S.usingMock, reconnecting: S.reconnecting, killed,
+      hasPending: S.pendingCount > 0, pendingCount: S.pendingCount,
+
+      vaultEmpty: S.ready && S.files.length === 0,
+      hasVault: !S.ready || S.files.length > 0,
+      vaultRoot: S.vaultRoot || '—', fileCount: S.files.length, tree,
+
+      hasSelection: !!sel, noSelection: S.ready && !sel && S.files.length > 0,
+      selFolder, selName: sel ? this._basename(sel) : '',
+      fileLoading: S.fileLoading, fileError: !!S.fileError,
+      fileErrorTitle: S.fileError ? S.fileError.title : '', fileErrorDetail: S.fileError ? S.fileError.detail : '',
+      fileReady, docBody: fileReady ? this._renderMarkdown(S.fileContent) : null,
+      docScrollRef: this.docScrollRef,
+
+      toggleKill: this.toggleKill,
+      knobX: killed ? '20px' : '2px', knobColor: killed ? '#f2555a' : 'rgba(220,226,240,.6)',
+      killTextColor: killed ? '#ff9498' : 'rgba(230,140,144,.85)',
+      killBorder: killed ? 'rgba(242,85,90,.5)' : 'rgba(242,85,90,.22)',
+      killBg: killed ? 'rgba(242,85,90,.12)' : 'rgba(242,85,90,.04)',
+
+      toasts: (S.toasts || []).map(t => ({ text: t.text, color: { red: '#f2555a', green: '#3ecf8e', cyan: '#79dcec', amber: '#e6b23e' }[t.tone] || '#79dcec' })),
+
+      confirmOpen: !!S.confirm,
+      confirmTitle: S.confirm && S.confirm.kind === 'engage' ? 'Engage the kill switch?' : 'Release the kill switch?',
+      confirmBody: S.confirm && S.confirm.kind === 'engage'
+        ? 'This immediately pauses ALL agent activity. In-flight jobs stop and nothing new dispatches until you release it.'
+        : 'Agents resume from where they paused and new commands can dispatch again.',
+      confirmYesText: S.confirm && S.confirm.kind === 'engage' ? 'Engage kill switch' : 'Resume agents',
+      confirmYesColor: S.confirm && S.confirm.kind === 'engage' ? '#f2555a' : '#3ecf8e',
+      confirmYesBg: S.confirm && S.confirm.kind === 'engage' ? 'rgba(242,85,90,.14)' : 'rgba(62,207,142,.14)',
+      confirmYes: this.confirmYes, confirmNo: this.confirmNo
+    };
+  }
+}
+</script>
+</body>
+</html>

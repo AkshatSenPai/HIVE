@@ -12,3 +12,6 @@ dist/
 build/
 .DS_Store
 Thumbs.db
+.fe_import/
+.playwright-mcp/
+*_serve.log
