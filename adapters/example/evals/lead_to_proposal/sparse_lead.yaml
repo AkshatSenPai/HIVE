@@ -1,0 +1,17 @@
+# Golden case: a sparse lead (no size, no location). The pipeline must still
+# complete and gate — and the brief should not invent specifics.
+# (When agent-side missing-info escalation lands, this case's expectation
+# changes to final_state: escalated — that's the point of keeping it golden.)
+name: sparse_lead
+workflow: lead_to_proposal
+event:
+  type: lead.new
+  metadata:
+    subject: "fit-out enquiry"
+    raw_context: "hi, do you do office interiors? what would it cost"
+    source: "email:eval"
+checks:
+  final_state: awaiting_approval
+  artifacts: [Plan, Brief, Draft, Deliverable]
+  pending_card: true
+  max_usd: 1.0

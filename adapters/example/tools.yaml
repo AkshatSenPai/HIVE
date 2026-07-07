@@ -1,0 +1,11 @@
+# Least-privilege toolsets per agent (PRD §11.3).
+# Only names/references here — credentials live in the environment or OS
+# keychain, never in the repo.
+agents:
+  coordinator:
+    tools: [plan, delegate, review, assemble]
+  research:
+    tools: [vault_read]        # web_search added in P1 when the action layer lands
+  maker:
+    tools: [vault_read]
+credentials: {}                # e.g. gmail: env:HIVE_GMAIL_TOKEN

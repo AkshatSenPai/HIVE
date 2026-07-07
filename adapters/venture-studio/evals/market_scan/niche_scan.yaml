@@ -1,0 +1,23 @@
+# Golden case: a narrower, scoped scan — the shortlist must stay structured
+# even when the niche is specific.
+name: niche_scan
+workflow: market_scan
+event:
+  type: owner.request
+  metadata:
+    subject: "Find viable app opportunities in note-taking and study tools for college students"
+    source: "eval"
+checks:
+  final_state: awaiting_approval
+  artifacts: [Plan, Brief, Draft, Deliverable]
+  pending_card: true
+  max_usd: 1.0
+content:
+  - artifact: Draft
+    field: body
+    must_contain: ["demand signal", "target user"]
+    must_not_contain: ["as an ai"]
+    max_words: 1500
+  - artifact: Brief
+    field: summary
+    must_contain: ["student"]

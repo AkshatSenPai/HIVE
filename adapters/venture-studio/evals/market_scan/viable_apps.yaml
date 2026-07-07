@@ -1,0 +1,20 @@
+# Golden case: the canonical owner ask. Structural checks run on every
+# backend; content checks judge real generation (ollama/anthropic only).
+name: viable_apps
+workflow: market_scan
+event:
+  type: owner.request
+  metadata:
+    subject: "Search the market for viable apps we can make and which are needed in the market"
+    source: "eval"
+checks:
+  final_state: awaiting_approval   # scans always stop at the owner checkpoint
+  artifacts: [Plan, Brief, Draft, Deliverable]
+  pending_card: true
+  max_usd: 1.0
+content:
+  - artifact: Draft
+    field: body
+    must_contain: ["demand signal", "monetization", "kill criteria"]
+    must_not_contain: ["as an ai", "i cannot browse"]
+    max_words: 1500

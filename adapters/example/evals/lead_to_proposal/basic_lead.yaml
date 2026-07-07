@@ -1,0 +1,20 @@
+# Golden case: well-formed inbound lead -> proposal package gated on approval.
+name: basic_lead
+workflow: lead_to_proposal
+event:
+  type: lead.new
+  metadata:
+    subject: "Acme Interiors — 2,400 sq yd office fit-out enquiry"
+    raw_context: "We have a 2,400 sq yd office fit-out in Gurgaon, timeline 3 months. Please send a proposal. — Priya, Acme"
+    source: "email:eval"
+checks:
+  final_state: awaiting_approval   # send is gated; job must never reach done unattended
+  artifacts: [Plan, Brief, Draft, Deliverable]
+  pending_card: true
+  max_usd: 1.0
+content:
+  - artifact: Draft
+    field: body
+    must_contain: ["pricing", "timeline", "next step"]
+    must_not_contain: ["as an ai"]
+    max_words: 800   # SOP says under 500; hard-fail at 800

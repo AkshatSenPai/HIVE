@@ -1,0 +1,10 @@
+# What success means for this business — reported in the digest (PRD §13).
+targets:
+  owner_touches_per_job: 2          # P0 exit: <=2
+  jobs_without_escalation_pct: 80
+  trigger_to_approved_hours: 24
+  cost_per_job_usd_max: 1.0
+  ungated_consequential_actions: 0  # hard fail if ever nonzero
+revenue_linked:
+  pilot_workflow: lead_to_proposal
+  measure: proposal_conversion_rate

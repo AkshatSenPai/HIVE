@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>HIVE — placeholder</title>
+  <style>
+    /* Intentionally plain. This is a diagnostic stub, not a design.
+       Replace this whole file with your Claude Design export. */
+    body { font: 15px/1.5 system-ui, sans-serif; max-width: 720px; margin: 40px auto; padding: 0 16px; color: #1a1a1a; }
+    h1 { font-size: 20px; }
+    .note { background: #fff8e1; border: 1px solid #ffe082; padding: 12px 14px; border-radius: 8px; }
+    .card { border: 1px solid #e0e0e0; border-radius: 8px; padding: 12px 14px; margin: 10px 0; }
+    .k { color: #666; } .v { font-weight: 600; }
+    code { background: #f2f2f2; padding: 1px 5px; border-radius: 4px; }
+    button { font: inherit; padding: 6px 12px; border: 1px solid #bbb; border-radius: 6px; background: #fff; cursor: pointer; }
+  </style>
+</head>
+<body>
+  <h1>HIVE backend is up ✅</h1>
+  <p class="note">
+    This is a placeholder served by <code>hive serve</code> from <code>web/index.html</code>.
+    Replace this file with your Claude Design export — same-origin, so your JS calls the API
+    with <strong>relative paths</strong> (<code>fetch('/jobs')</code>), no CORS, no second server.
+  </p>
+
+  <div class="card" id="health"><span class="k">health:</span> <span class="v">loading…</span></div>
+  <div class="card" id="adapter"><span class="k">adapter:</span> <span class="v">loading…</span></div>
+  <div class="card" id="jobs"><span class="k">jobs:</span> <span class="v">loading…</span></div>
+  <div class="card" id="approvals"><span class="k">pending approvals:</span> <span class="v">loading…</span></div>
+
+  <p>
+    <button onclick="ask()">Send a test request to HIVE</button>
+    <span id="askResult"></span>
+  </p>
+
+  <p class="k">Full API reference: <a href="/docs">/docs</a></p>
+
+  <script>
+    // The fetch pattern your real frontend uses — relative paths, JSON in/out.
+    const j = (path, opts) => fetch(path, opts).then(r => r.json());
+
+    async function refresh() {
+      const health = await j('/health');
+      document.querySelector('#health .v').textContent =
+        `${health.status} · kill switch ${health.kill_switch ? 'ON' : 'off'}`;
+
+      const adapter = await j('/adapter');
+      document.querySelector('#adapter .v').textContent =
+        `${adapter.name} · ${adapter.workflows.length} workflow(s)`;
+
+      const { jobs } = await j('/jobs');
+      document.querySelector('#jobs .v').textContent =
+        jobs.length ? jobs.map(x => x.state).join(', ') : 'none yet';
+
+      const { cards } = await j('/approvals');
+      document.querySelector('#approvals .v').textContent = cards.length;
+    }
+
+    async function ask() {
+      document.querySelector('#askResult').textContent = ' …running';
+      const res = await j('/jobs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ subject: 'Placeholder test request from the UI' }),
+      });
+      document.querySelector('#askResult').textContent =
+        res.job ? ` → job ${res.job.id} is ${res.job.state}` : ` → ${res.detail || 'no workflow matched'}`;
+      refresh();
+    }
+
+    refresh();
+  </script>
+</body>
+</html>

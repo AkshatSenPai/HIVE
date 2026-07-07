@@ -1,0 +1,21 @@
+# Governance policy for this business (PRD §3, §10, §11).
+gated_actions: [send, spend, publish, contract, live_settings]
+
+autonomy:
+  default: L1                 # gated
+  upgrade_threshold: 10       # consecutive approvals before an upgrade is proposed
+
+review:
+  enabled: true               # coordinator reviews each specialist output vs done_when
+  max_reworks: 1              # rework rounds before stop-and-ask (never accept by exhaustion)
+
+budgets:
+  per_job:
+    max_steps: 20
+    max_tokens: 150000
+    max_usd: 1.0
+  global_daily:
+    max_usd: 20.0
+
+escalation:
+  stop_and_ask_on: [ambiguity, missing_info, low_confidence, out_of_workflow, budget_edge]

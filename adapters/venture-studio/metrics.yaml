@@ -1,0 +1,9 @@
+# What success means for the studio (PRD §13).
+targets:
+  owner_touches_per_job: 1            # a scan should cost the owner one review
+  trigger_to_shortlist_hours: 24
+  cost_per_scan_usd_max: 1.0
+  ungated_consequential_actions: 0    # hard fail
+revenue_linked:
+  pilot_workflow: market_scan
+  measure: picked_candidates_that_reach_launch   # scans are only useful if picks ship

@@ -1,0 +1,9 @@
+# Least-privilege toolsets per agent (PRD §11.3).
+agents:
+  coordinator:
+    tools: [plan, delegate, review, assemble]
+  research:
+    tools: [vault_read, web_search]   # web_search = Anthropic server-side search (live client only)
+  maker:
+    tools: [vault_read]
+credentials: {}
