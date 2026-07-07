@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <defs>
+    <linearGradient id="hexfill" x1="6" y1="4" x2="26" y2="28" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#eef7ff"/>
+      <stop offset="1" stop-color="#4fc9e6"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="16" cy="15" r="13" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5ccfe6" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#5ccfe6" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="hclip">
+      <polygon points="16,4 27.6,10.5 27.6,21.5 16,28 4.4,21.5 4.4,10.5"/>
+    </clipPath>
+  </defs>
+
+  <!-- dark rounded tile -->
+  <rect width="32" height="32" rx="7.5" fill="#070910"/>
+  <!-- brand glow -->
+  <circle cx="16" cy="15" r="13" fill="url(#glow)"/>
+
+  <!-- HIVE hexagon (honeycomb cell) with two bee-stripes, clipped to the hex -->
+  <g clip-path="url(#hclip)">
+    <polygon points="16,4 27.6,10.5 27.6,21.5 16,28 4.4,21.5 4.4,10.5" fill="url(#hexfill)"/>
+    <rect x="0" y="12.4" width="32" height="2.7" fill="#070910" opacity=".82"/>
+    <rect x="0" y="17.3" width="32" height="2.7" fill="#070910" opacity=".82"/>
+  </g>
+  <!-- crisp edge -->
+  <polygon points="16,4 27.6,10.5 27.6,21.5 16,28 4.4,21.5 4.4,10.5"
+           fill="none" stroke="#eaf6ff" stroke-opacity=".38" stroke-width="1"/>
+</svg>
