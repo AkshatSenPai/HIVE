@@ -47,6 +47,7 @@ Event ──▶ EventBus ──▶ Coordinator ──▶ Job (FSM, SQLite)
 | Memory fabric (§4) | `memory/` | semantic vault (path-safe), episodic queries over jobs DB, procedural SOP loader |
 | Multi-model routing (§9) | `agents/model.py` | tiers: planner → Opus, specialist → Sonnet, extractor → Haiku, frontier → Fable (owner-gated); adaptive thinking on. Three backends: `stub` ($0, canned), `ollama` ($0, real local inference — dev/free tier; no server-side tools), `anthropic` (live, paid) |
 | Action layer (§4) | `actions/registry.py` | server-side tools only for P0 — `web_search` (Anthropic-hosted, max_uses-capped); least privilege enforced at the agent chokepoint |
+| Owner voice (§3, P4 pulled fwd) | `voice/backends.py` + `api` `/voice/*` `/brief` + `web/hive-voice.js` | hands-free owner channel: Whisper STT + Kokoro TTS behind a `stub`/`local` backend (mirrors model backends); floating browser widget (push-to-talk, intent routing, approval-review with read-back+confirm). Agent phone-calls still deferred. Spec: `docs/superpowers/specs/2026-07-08-hive-voice-design.md`. Hardened via an adversarial review (see below). |
 | Traces (§9) | `observability/trace.py` | JSONL per job; tokens + $ on every model call |
 | Adapters (§6) | `adapter.py` + `adapters/example/` | profile/workflows/tools/policies/metrics |
 | SOPs (§7) | `memory/procedural.py` | YAML frontmatter (machine contract) + markdown body (intern-readable instructions) |
@@ -89,6 +90,33 @@ swapping in a new design is dropping a file. A plain placeholder lives at
 `web/index.html` and doubles as the fetch-pattern reference; it's overwritten
 by the real export. The static mount is conditional — no `index.html`, no
 mount, `/` 404s, API unaffected (test: `test_no_ui_when_absent`).
+
+## Approval-path safety (hardened 2026-07-08, from the voice review)
+
+An adversarial multi-agent review of the voice code surfaced two safety holes
+that were **not** voice-specific and are now fixed in `resolve_approval`:
+
+1. **Kill switch now blocks decisions.** Previously the kill switch was only
+   checked at the model-call chokepoint (`ask_model`); an approval that runs a
+   `send` executes email directly (no model call), so an engaged emergency stop
+   did **not** block it. `resolve_approval` now raises `DecisionRefused` (API
+   409) while the switch is engaged, and `_execute_send` re-checks (covers the
+   earned-L2 auto path). This matches the dashboard's "decisions are held while
+   paused" promise.
+2. **Decisions are idempotent.** `resolve_approval` refuses a card that isn't
+   `PENDING` — a retry / double-click / stale voice re-approve can no longer
+   run a consequential action (duplicate send) twice.
+
+Client-side, the voice widget's confirm gate was tightened: `isYes` is
+affirmative-only and any negation vetoes it (so "no, don't do it" can't satisfy
+a read-back), `decision` checks reject before approve and blocks approve on any
+negation, the push-to-talk start/stop race (hot-mic) is guarded, and a failed
+decision POST is never announced as success. **Note (by design, not a bug):**
+the read-back+confirm is a voice-UX safeguard against mishearing, enforced
+client-side — the server invariant remains "approve = the owner decided" (same
+as the dashboard's one-click approve). A server-side confirm token would be
+inconsistent with the dashboard flow; the local single-owner API is
+unauthenticated by design. Revisit if HIVE ever becomes multi-user/hosted.
 
 ## Known P0 simplifications (intentional, tracked)
 

@@ -40,10 +40,20 @@ class HiveConfig(BaseModel):
     smtp_port: int = 587
     smtp_user: str | None = None
     smtp_password: str | None = None
+    # Voice: "stub" (canned, no install, $0) · "local" (faster-whisper +
+    # kokoro-onnx, local, $0, needs models). Owner-channel voice only.
+    voice_backend: str = "stub"
+    whisper_model: str = "base"
+    kokoro_voice: str = "af_heart"
+    voice_model_override: Path | None = None  # where the Kokoro ONNX + voices live
 
     @property
     def outbox_dir(self) -> Path:
         return self.data_dir / "outbox"
+
+    @property
+    def voice_model_dir(self) -> Path:
+        return self.voice_model_override or (self.data_dir / "voice-models")
 
     @property
     def use_llm(self) -> bool:  # kept for API/back-compat: "costs real money?"
@@ -106,4 +116,12 @@ class HiveConfig(BaseModel):
             kwargs["smtp_user"] = su
         if spw := os.environ.get("HIVE_SMTP_PASSWORD"):
             kwargs["smtp_password"] = spw
+        if vb := os.environ.get("HIVE_VOICE_BACKEND"):
+            kwargs["voice_backend"] = vb.lower()
+        if wm := os.environ.get("HIVE_WHISPER_MODEL"):
+            kwargs["whisper_model"] = wm
+        if kv := os.environ.get("HIVE_KOKORO_VOICE"):
+            kwargs["kokoro_voice"] = kv
+        if vmd := os.environ.get("HIVE_VOICE_MODEL_DIR"):
+            kwargs["voice_model_override"] = Path(vmd)
         return cls(**kwargs)

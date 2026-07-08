@@ -16,7 +16,7 @@ import hmac
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import Body, FastAPI, Header, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -54,6 +54,10 @@ class RatifyRequest(BaseModel):
     # Module-level on purpose: with `from __future__ import annotations`,
     # FastAPI can't resolve models defined inside create_app.
     step_key: str
+
+
+class SpeakRequest(BaseModel):
+    text: str
 
 
 def create_app(runtime: Runtime | None = None, web_dir: Path | None = None) -> FastAPI:
@@ -132,6 +136,7 @@ def create_app(runtime: Runtime | None = None, web_dir: Path | None = None) -> F
             "kill_switch": rt.kill_switch.engaged,
             "spend_today_usd": round(rt.store.spend_on(datetime.now(timezone.utc).date()), 6),
             "global_daily_cap_usd": rt.adapter.policies.get("budgets", {}).get("global_daily", {}).get("max_usd"),
+            "voice": {"backend": rt.voice.name, "ready": rt.voice.ready},
         }
 
     # -- jobs ---------------------------------------------------------------
@@ -178,11 +183,15 @@ def create_app(runtime: Runtime | None = None, web_dir: Path | None = None) -> F
 
     @app.post("/approvals/{card_id}/decision")
     def decide(card_id: str, req: DecisionRequest) -> dict[str, Any]:
+        from hive.agents.coordinator import DecisionRefused
+
         try:
             with lock:
                 job = rt.coordinator.resolve_approval(card_id, _DECISION_MAP[req.decision], note=req.note)
         except KeyError as exc:
             raise HTTPException(404, str(exc)) from exc
+        except DecisionRefused as exc:  # already decided, or paused
+            raise HTTPException(409, str(exc)) from exc
         return {"job": job, "card": rt.store.get_card(card_id)}
 
     # -- webhook event source -------------------------------------------------
@@ -239,6 +248,32 @@ def create_app(runtime: Runtime | None = None, web_dir: Path | None = None) -> F
     @app.get("/digest")
     def digest() -> dict[str, str]:
         return {"text": build_digest(rt.store, rt.adapter.policies)}
+
+    @app.get("/brief")
+    def brief() -> dict[str, str]:
+        """Short, prioritized, spoken-style briefing — the voice 'give me a brief'."""
+        from hive.governance.digest import build_brief
+
+        return {"text": build_brief(rt.store, rt.adapter.policies)}
+
+    # -- voice (owner-channel; STT in, TTS out) ------------------------------
+
+    @app.post("/voice/transcribe")
+    def voice_transcribe(audio: bytes = Body(..., media_type="audio/wav")) -> dict[str, str]:
+        """Speech -> text. Body is a 16 kHz mono WAV from the browser."""
+        try:
+            return {"text": rt.voice.transcribe(audio)}
+        except Exception as exc:
+            raise HTTPException(500, f"transcription failed: {exc}") from exc
+
+    @app.post("/voice/speak")
+    def voice_speak(req: SpeakRequest) -> Response:
+        """Text -> speech. Returns a WAV the browser plays."""
+        try:
+            wav = rt.voice.speak(req.text)
+        except Exception as exc:
+            raise HTTPException(500, f"speech synthesis failed: {exc}") from exc
+        return Response(content=wav, media_type="audio/wav")
 
     @app.post("/digest/send")
     def digest_send() -> dict[str, Any]:

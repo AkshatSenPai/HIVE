@@ -59,3 +59,68 @@ def build_digest(store: JobStore, policies: dict[str, Any] | None = None) -> str
                     f"-> upgrade {rec.level.name} to {next_level.name}  (hive ratify {key})"
                 )
     return "\n".join(lines)
+
+
+def _money_phrase(usd: float) -> str:
+    """TTS-friendly money: '4 cents', '1 cent', '1 dollar', '18,000 dollars'."""
+    usd = float(usd)
+    if usd < 1:
+        cents = round(usd * 100)
+        return f"{cents} cent" + ("" if cents == 1 else "s")
+    body = f"{usd:,.0f}" if usd == round(usd) else f"{usd:,.2f}"
+    return f"{body} " + ("dollar" if usd == 1 else "dollars")
+
+
+def build_brief(store: JobStore, policies: dict[str, Any] | None = None) -> str:
+    """A short, prioritized, spoken-style status briefing (PRD §3.2, voice).
+
+    The speakable cousin of the digest: prioritized (what needs you first),
+    conversational, a few sentences. Deterministic and $0 — same source data
+    as the digest, phrased for the ear."""
+    jobs = store.list_jobs()
+    pending = store.list_cards(status=ApprovalStatus.PENDING.value)
+    attention = [j for j in jobs if j.state in (JobState.ESCALATED, JobState.FAILED)]
+    inflight = [
+        j for j in jobs
+        if j.state in (JobState.QUEUED, JobState.PLANNING, JobState.EXECUTING, JobState.REVIEWING)
+    ]
+
+    parts: list[str] = []
+
+    if not pending and not attention:
+        parts.append("All clear — nothing is waiting on you right now.")
+    else:
+        bits = []
+        if pending:
+            bits.append(f"{len(pending)} approval" + ("" if len(pending) == 1 else "s") + " waiting")
+        if attention:
+            bits.append(f"{len(attention)} job" + ("" if len(attention) == 1 else "s") + " needing attention")
+        parts.append("You have " + " and ".join(bits) + ".")
+
+    if pending:
+        detail = "; ".join(f"{c.title}, {_money_phrase(c.cost_so_far_usd)}" for c in pending[:3])
+        parts.append("Waiting for you: " + detail + ".")
+        if len(pending) > 3:
+            parts.append(f"And {len(pending) - 3} more in the approvals queue.")
+
+    if attention:
+        detail = "; ".join(
+            f"{j.workflow} {j.state.value}" + (f", {j.error}" if j.error else "")
+            for j in attention[:3]
+        )
+        parts.append("Needs attention: " + detail + ".")
+
+    if inflight:
+        parts.append(f"{len(inflight)} job" + ("" if len(inflight) == 1 else "s") + " in progress.")
+
+    spent_today = store.spend_on(datetime.now(timezone.utc).date())
+    cap = (policies or {}).get("budgets", {}).get("global_daily", {}).get("max_usd")
+    money = f"You've spent {_money_phrase(spent_today)} today"
+    if cap:
+        try:  # a misconfigured (non-numeric) cap must not 500 the brief
+            money += f", of a {_money_phrase(float(cap))} daily cap"
+        except (TypeError, ValueError):
+            pass
+    parts.append(money + ".")
+
+    return " ".join(parts)

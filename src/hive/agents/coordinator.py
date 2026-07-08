@@ -43,6 +43,12 @@ class ReviewFailed(Exception):
         super().__init__(f"step '{step_id}' failed review after {rounds} rework(s)")
 
 
+class DecisionRefused(Exception):
+    """An approval decision was refused before it could act — the card was
+    already decided (idempotency) or activity is paused (kill switch). A
+    consequential action must run at most once, and never while paused."""
+
+
 def _parse_verdict(text: str) -> tuple[str, str]:
     """Extract 'pass' | 'revise' | 'unparsed' from a review reply."""
     for line in text.splitlines():
@@ -360,6 +366,15 @@ class Coordinator(Agent):
         job = self.store.get_job(card.job_id)
         if job is None:
             raise KeyError(f"card {card_id} references missing job {card.job_id}")
+        # The kill switch holds ALL decisions while engaged (the dashboard
+        # promises this) — the emergency stop must block the consequential
+        # send/spend it exists to stop, not just model calls.
+        if self.kill_switch.engaged:
+            raise DecisionRefused("decisions are paused — the kill switch is engaged")
+        # Idempotency: a card is decided once. A retry / double-click / stale
+        # voice re-approve must NOT re-run a consequential action (duplicate send).
+        if card.status is not ApprovalStatus.PENDING:
+            raise DecisionRefused(f"card {card_id} was already {card.status.value}")
         card.decide(status, note)
         self.store.save_card(card)
         job.owner_touches += 1
@@ -401,6 +416,7 @@ class Coordinator(Agent):
         problem; callers translate that into FAILED + a visible error."""
         if self.email_sender is None:
             raise RuntimeError("no email sender configured (see HIVE_EMAIL_BACKEND)")
+        self.kill_switch.check()  # never send while paused (also covers the auto-L2 path)
         recipient = str(job.context.get("reply_to", "")).strip()
         if "@" not in recipient:
             raise ValueError("no recipient: job context has no 'reply_to' address")

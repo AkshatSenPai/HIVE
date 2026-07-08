@@ -31,8 +31,10 @@ class Runtime:
         self.kill_switch = KillSwitch()
         self.model: ModelClient = model or self._make_model()
         from hive.actions.email import make_email_sender
+        from hive.voice import make_voice_backend
 
         self.email_sender = make_email_sender(self.config)
+        self.voice = make_voice_backend(self.config)
         self.coordinator = Coordinator(
             adapter=self.adapter,
             store=self.store,
