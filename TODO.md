@@ -1,7 +1,9 @@
 # HIVE — TODO
 
-Status as of 2026-07-08. The P0 machinery + dashboard + owner-channel voice are
-built and tested (124 tests, all green, pushed to `main`). What remains is below.
+Status as of 2026-07-11. The P0 machinery + dashboard + owner-channel voice are
+built and tested (**125 tests green** on the 3.11 voice venv; 124 + 1 skipped on
+the stub-only 3.14 interpreter). Local voice (Whisper + Kokoro) now runs
+end-to-end. What remains is below.
 
 Legend: 🟢 free / buildable now · 💳 needs a funded API key (money) · 🔑 needs
 free credentials (you set up) · 🧊 deferred to a later PRD phase.
@@ -10,19 +12,21 @@ free credentials (you set up) · 🧊 deferred to a later PRD phase.
 
 ## Part 1 — What's left in the VOICE part
 
-Owner-channel voice is **built** (Whisper STT + Kokoro TTS, stub/local backends,
-floating widget, `/brief`, approval-review with read-back+confirm, hardened by an
-adversarial review). What's left:
+Owner-channel voice is **built and now runs for real** (Whisper STT + Kokoro TTS,
+stub/local backends, floating widget, `/brief`, approval-review with read-back+confirm,
+hardened by an adversarial review). Local voice uses **the same stack as Zenith** —
+`faster-whisper` + the `kokoro` package (`KPipeline`), models auto-downloading from
+HuggingFace. What's left:
 
-### To make voice actually work (not the stub tone/canned text)
-- [ ] 🟢 Add a `[voice]` extra to `pyproject.toml` (`faster-whisper`, `kokoro-onnx`) so install is `pip install -e ".[voice]"`. *(Not added yet.)*
-- [ ] 🟢 Install the local models: `pip install faster-whisper kokoro-onnx`, then fetch the Kokoro **ONNX** weights (`kokoro-v1.0.onnx` + `voices-v1.0.bin`) into `HIVE_VOICE_MODEL_DIR` (the PyTorch Kokoro-82M already in the HF cache is *not* the onnx export).
-- [ ] 🟢 Flip `HIVE_VOICE_BACKEND=local` and run the round-trip smoke test (text → Kokoro → WAV → Whisper → text). *(Test is specced; run once models exist.)*
-- [ ] 👤 **Owner-verify the live mic loop in the browser** — hold-to-talk, speak a command, hear a real reply; run the approval review by voice. (Can't be tested headless — no mic in the agent sandbox.)
+### To make voice actually work (not the stub tone/canned text) — ✅ DONE 2026-07-11
+- [x] 🟢 `[voice]` extra in `pyproject.toml` (`faster-whisper`, `kokoro`, `torch`, `soundfile`, `numpy`) — install is `pip install -e ".[voice]"`.
+- [x] 🟢 Local stack installed in a **Python 3.11 venv** (`.venv`; kokoro/spacy/blis have no 3.14 wheels). `LocalVoiceBackend` was rewritten off `kokoro-onnx` onto the `kokoro` package to match Zenith; models **auto-download from HuggingFace** on first use (no manual weight fetch), reusing Zenith's cache.
+- [x] 🟢 `HIVE_VOICE_BACKEND=local` round-trip smoke test passes on **real models** (text → Kokoro → WAV → Whisper → text). Full suite: **125 green** on the 3.11 venv; **124 + 1 skipped** on 3.14 (stub path untouched).
+- [x] 👤 **Owner-verified the live mic loop in the browser (2026-07-11)** — real mic, hold-to-talk, spoken commands + brief + approval review all work. Tuning that made it usable: Whisper `base` was too weak (mis-heard "brief" → "breeze"); bumped default to `small`, and fixed the mic capture (16 kHz AudioContext + low-pass + AGC) so consonants survive.
 
 ### Tuning (once local voice runs)
 - [ ] 🟢 Pick the "hive voice" — `HIVE_KOKORO_VOICE` (default `af_heart`; Kokoro has several).
-- [ ] 🟢 Tune Whisper size vs latency — `HIVE_WHISPER_MODEL` (`base` default; `small`/`medium` for accuracy, slower on CPU).
+- [x] 🟢 Tune Whisper size vs latency — default bumped `base` → `small` (Zenith's CPU default; `base` mis-heard real mic speech, e.g. "brief" → "breeze"). `medium` for more accuracy, slower. Also fixed the browser mic capture (16 kHz AudioContext + low-pass + AGC/NS) so consonants survive.
 
 ### Voice polish (optional, non-blocking)
 - [ ] 🟢 Real VAD/silence auto-listen in the approval-review loop (currently a fixed ~4.5s window).
@@ -81,5 +85,7 @@ episodic · procedural SOPs) · 3 model backends (stub/Ollama/Anthropic) · even
 sources (file inbox · token-gated webhook) · eval harness w/ golden cases ·
 scheduled digest + delivery (vault + Telegram-ready) · FastAPI over the runtime ·
 8-page dashboard (live-wired, cross-fade transitions, hex-bee favicon) ·
-owner-channel voice (stub/local, hardened). Pushed to
-github.com/AkshatSenPai/HIVE.
+owner-channel voice (stub + real local Whisper/Kokoro, round-trip-verified,
+hardened). Prior work pushed to github.com/AkshatSenPai/HIVE; the 2026-07-11
+local-voice enablement (kokoro package + 3.11 venv) is on the working tree, not
+yet committed.

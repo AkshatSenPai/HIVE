@@ -40,20 +40,24 @@ class HiveConfig(BaseModel):
     smtp_port: int = 587
     smtp_user: str | None = None
     smtp_password: str | None = None
-    # Voice: "stub" (canned, no install, $0) · "local" (faster-whisper +
-    # kokoro-onnx, local, $0, needs models). Owner-channel voice only.
+    # Voice: "stub" (canned, no install, $0) · "local" (faster-whisper + kokoro,
+    # local, $0 — Zenith's stack; models auto-download from HuggingFace on first
+    # use). Owner-channel voice only. `local` needs the [voice] extra on Py 3.11.
     voice_backend: str = "stub"
-    whisper_model: str = "base"
-    kokoro_voice: str = "af_heart"
-    voice_model_override: Path | None = None  # where the Kokoro ONNX + voices live
+    whisper_model: str = "small"       # faster-whisper size; small = Zenith's CPU default ("base is too weak")
+    kokoro_voice: str = "af_heart"     # Kokoro voice (af_heart, am_michael, bm_george, …)
+    kokoro_lang: str = "a"             # a=American, b=British English
+    voice_model_override: Path | None = None  # optional dir for the voice models; unset => shared HF cache
 
     @property
     def outbox_dir(self) -> Path:
         return self.data_dir / "outbox"
 
     @property
-    def voice_model_dir(self) -> Path:
-        return self.voice_model_override or (self.data_dir / "voice-models")
+    def voice_model_dir(self) -> Path | None:
+        # Unset => faster-whisper + kokoro use the shared HuggingFace cache
+        # (which reuses any weights Zenith already downloaded).
+        return self.voice_model_override
 
     @property
     def use_llm(self) -> bool:  # kept for API/back-compat: "costs real money?"
@@ -122,6 +126,8 @@ class HiveConfig(BaseModel):
             kwargs["whisper_model"] = wm
         if kv := os.environ.get("HIVE_KOKORO_VOICE"):
             kwargs["kokoro_voice"] = kv
+        if kl := os.environ.get("HIVE_KOKORO_LANG"):
+            kwargs["kokoro_lang"] = kl
         if vmd := os.environ.get("HIVE_VOICE_MODEL_DIR"):
             kwargs["voice_model_override"] = Path(vmd)
         return cls(**kwargs)

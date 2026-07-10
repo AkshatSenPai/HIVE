@@ -31,20 +31,35 @@
   // Capture mic as 16 kHz mono 16-bit WAV via the Web Audio API (no MediaRecorder
   // -> no webm -> no server-side ffmpeg). Returns a recorder with .stop() -> Blob.
   async function startRecording() {
-    var stream = await navigator.mediaDevices.getUserMedia({ audio: { channelCount: 1 } });
+    var stream = await navigator.mediaDevices.getUserMedia({
+      // AGC lifts quiet speech; NS/EC clean the room — all raise STT accuracy.
+      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+    });
     var Ctx = window.AudioContext || window.webkitAudioContext;
-    var ctx = new Ctx();
+    // Ask the browser to run the graph at 16 kHz so IT does the properly
+    // anti-aliased resample to Whisper's rate — far better than decimating
+    // ourselves. Falls back to the native rate if the option isn't honored.
+    var ctx;
+    try { ctx = new Ctx({ sampleRate: 16000 }); } catch (_) { ctx = new Ctx(); }
     var source = ctx.createMediaStreamSource(stream);
+    // Low-pass just under Nyquist so that IF the browser ignored the 16 kHz
+    // request, our fallback decimation in encodeWav can't alias the fricatives
+    // (f / s / th) that tell "brief" from "breeze" / "breath" / "peace".
+    var lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 7500;
     var proc = ctx.createScriptProcessor(4096, 1, 1);
     var chunks = [];
     proc.onaudioprocess = function (e) {
       chunks.push(new Float32Array(e.inputBuffer.getChannelData(0)));
     };
-    source.connect(proc);
+    source.connect(lp);
+    lp.connect(proc);
     proc.connect(ctx.destination); // output stays silent (we never fill it)
     return {
       stop: async function () {
         proc.disconnect();
+        lp.disconnect();
         source.disconnect();
         stream.getTracks().forEach(function (t) { t.stop(); });
         var rate = ctx.sampleRate;
