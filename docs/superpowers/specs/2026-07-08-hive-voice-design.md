@@ -75,9 +75,15 @@ Mirrors `stub | ollama | anthropic`. New `src/hive/voice/`:
 - **`StubVoiceBackend`** (default): `transcribe` returns a configured canned
   string (so the loop + tests run with no audio); `speak` returns a short
   valid WAV (a soft tone / near-silence). **No install, fully testable headless.**
-- **`LocalVoiceBackend`**: `faster-whisper` (CT2, CPU, no torch/ffmpeg) for STT;
-  `kokoro-onnx` (uses the already-present `onnxruntime`, no torch) for TTS.
-  Enabled with `HIVE_VOICE_BACKEND=local`. Lazy-loads models on first use.
+- **`LocalVoiceBackend`**: `faster-whisper` (CT2, CPU) for STT; `kokoro` (the
+  `KPipeline` package, torch-driven, CPU) for TTS — **the same stack as Zenith**.
+  Enabled with `HIVE_VOICE_BACKEND=local`. Lazy-loads models on first use; both
+  auto-download from HuggingFace (Kokoro-82M ~330 MB; the Whisper weights). Needs
+  the `[voice]` extra on **Python 3.11** (spacy/blis have no 3.14 wheels).
+
+  *(Implementation note: an earlier draft targeted `kokoro-onnx` with manually
+  fetched `.onnx`/`.bin` weights; the shipped backend uses the `kokoro` package
+  to stay identical to Zenith and to reuse Zenith's already-cached weights.)*
 
 Config (env): `HIVE_VOICE_BACKEND` (`stub`|`local`, default `stub`),
 `HIVE_WHISPER_MODEL` (default `base`), `HIVE_KOKORO_VOICE` (default a chosen
@@ -166,7 +172,9 @@ tests/test_voice.py             # stub + round-trip + intent routing + brief
 1. Build everything against the **stub** backend — endpoints, widget, brief,
    intent routing, safety/confirm, tests. Verify headless + in-browser (stub
    speaks a tone, "transcribes" canned text) so the full loop is proven.
-2. Then, together: `pip install faster-whisper kokoro-onnx`, fetch the Kokoro
-   ONNX weights + voices into `HIVE_VOICE_MODEL_DIR`, flip
-   `HIVE_VOICE_BACKEND=local`, run the round-trip test, and you confirm the
-   live mic/speaker in the browser.
+2. Then, together (**Python 3.11 venv** — kokoro/spacy/blis have no 3.14 wheels):
+   `py -3.11 -m venv .venv` → `.venv\Scripts\pip install -e ".[voice,dev,api]"`
+   (CPU torch). The models **auto-download from HuggingFace on first use** — no
+   manual weight fetch — reusing anything Zenith already cached. Flip
+   `HIVE_VOICE_BACKEND=local`, run the round-trip test (`pytest -k roundtrip`),
+   and you confirm the live mic/speaker in the browser.

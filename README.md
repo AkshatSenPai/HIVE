@@ -33,6 +33,30 @@ hive -a adapters/venture-studio ask "Search the market for viable apps we can ma
 hive -a adapters/venture-studio approve <card_id>   # = "build this one"
 ```
 
+### Voice (local, optional — owner channel)
+
+Owner-channel voice defaults to a **stub** (canned transcript + a tone), so
+everything above runs with no models. For **real** local voice — `faster-whisper`
+(STT) + `kokoro` (TTS), the same stack as Zenith, $0 and offline — use a
+**Python 3.11** venv (kokoro/spacy/blis ship no 3.14 wheels):
+
+```powershell
+py -3.11 -m venv .venv
+.venv\Scripts\Activate.ps1
+pip install -e ".[voice,api]"     # CPU torch; ~1 GB of deps
+$env:HIVE_VOICE_BACKEND = "local" # flip on the real backend
+pytest -k roundtrip               # text -> Kokoro -> WAV -> Whisper -> text
+hive -a adapters/venture-studio serve
+```
+
+Models **auto-download from HuggingFace on first use** (Kokoro-82M ~330 MB; the
+Whisper weights per `HIVE_WHISPER_MODEL`) — no manual weight fetch. Knobs:
+`HIVE_WHISPER_MODEL` (`small` — `base` is too weak for real mic speech),
+`HIVE_KOKORO_VOICE` (`af_heart`), `HIVE_KOKORO_LANG` (`a`=American),
+`HIVE_VOICE_MODEL_DIR` (optional; defaults to the shared HF cache).
+Any of these can go in a **repo-root `.env`** (loaded at CLI startup) instead of
+the shell — copy `.env.example` and uncomment what you need.
+
 ### HTTP API (for the frontend)
 
 The dashboard talks to HIVE over JSON, not the CLI:
