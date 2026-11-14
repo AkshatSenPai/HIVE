@@ -14,31 +14,72 @@ from typing import Protocol
 
 from pydantic import BaseModel, Field
 
-# Routing tiers -> model IDs (owner's routing decision, 2026-07-06):
+# Routing tiers -> model IDs (owner's routing decision 2026-07-06; moved to the
+# current Claude generation 2026-11-14):
 #   planner    -> Opus   (coordinator judgment)
 #   specialist -> Sonnet (research + maker: the doing tier)
 #   extractor  -> Haiku  (quick replies, triage, extraction/formatting)
 #   frontier   -> Fable  (big projects only; must be proposed to the owner via
 #                         an approval card before any job runs on this tier)
 DEFAULT_ROUTING: dict[str, str] = {
-    "planner": "claude-opus-4-8",
-    "specialist": "claude-sonnet-5",
-    "extractor": "claude-haiku-4-5",
-    "frontier": "claude-fable-5",
+    "planner": "claude-opus-5-5",
+    "specialist": "claude-sonnet-5-5",
+    "extractor": "claude-haiku-5-5",
+    "frontier": "claude-fable-5-2",
+}
+
+# Effort per tier, sent explicitly as output_config.effort. These equal each
+# model's API default (Opus 5.5 and Haiku 5.5 default to "medium"; Sonnet 5.5
+# and Fable 5.2 to "high"), so behaviour matches "effort left at default" —
+# written out so it's visible and tunable. Tune per tier with `hive eval` once
+# real models run; effort levels don't map 1:1 across model generations.
+DEFAULT_EFFORT: dict[str, str] = {
+    "planner": "medium",
+    "specialist": "high",
+    "extractor": "medium",
+    "frontier": "high",
 }
 
 # Coordinator review prompts start with this exact prefix — the stub (and test
 # doubles) key on it to return well-formed verdicts for review calls only.
 REVIEW_PROMPT_PREFIX = "Review a specialist's output against its acceptance criterion."
 
-# Rough $/1M-token prices for spend attribution (input, output).
-# Sonnet 5 sticker is $3/$15 (intro $2/$10 through 2026-08-31) — track sticker.
+# Rough $/1M-token prices for spend attribution (input, output), first-party API
+# rates as of 2026-11. The routed models come first; older IDs stay so spend is
+# still attributed if a routing override or a future fallback serves them.
 _PRICING: dict[str, tuple[float, float]] = {
+    "claude-opus-5-5": (4.00, 20.00),
+    "claude-sonnet-5-5": (2.00, 10.00),
+    "claude-haiku-5-5": (0.10, 0.50),
+    "claude-fable-5-2": (8.00, 40.00),
+    "claude-opus-5": (5.00, 25.00),
     "claude-opus-4-8": (5.00, 25.00),
-    "claude-sonnet-5": (3.00, 15.00),
+    "claude-sonnet-5": (2.00, 10.00),
     "claude-haiku-4-5": (1.00, 5.00),
     "claude-fable-5": (10.00, 50.00),
 }
+
+# Models whose price steps up once a single request's prompt passes a size:
+# model -> (prompt-token threshold, input $/1M, output $/1M) above it.
+_LONG_PROMPT_PRICING: dict[str, tuple[int, float, float]] = {
+    "claude-haiku-5-5": (100_000, 0.50, 2.50),
+}
+
+
+class ModelRefusal(Exception):
+    """The model declined the request (stop_reason "refusal").
+
+    Raised instead of returning, so a declined or partial answer can never be
+    passed downstream as if it were real output. The agent chokepoint charges
+    `response` (tokens the call consumed) to the budget, then the coordinator
+    escalates to the owner — stop-and-ask, never a silent retry or guess.
+    """
+
+    def __init__(self, model: str, category: str | None, explanation: str | None,
+                 response: "ModelResponse") -> None:
+        self.model, self.category, self.explanation = model, category, explanation
+        self.response = response
+        super().__init__(f"{model} declined the request (category: {category or 'unspecified'})")
 
 
 class ModelResponse(BaseModel):
@@ -95,15 +136,18 @@ class StubModelClient:
 
 
 class AnthropicModelClient:
-    """Real client over the official Anthropic SDK. Adaptive thinking on;
-    effort left at default. Server-side tools (web search) are passed through
-    the registry; pause_turn is continued automatically up to a guard limit.
-    Kept minimal on purpose — harden per-call options (streaming for long
-    outputs, retries) as real workloads land."""
+    """Real client over the official Anthropic SDK. Adaptive thinking on (the
+    current models can't disable it); effort set per tier (DEFAULT_EFFORT).
+    Server-side tools (web search) are passed through the registry; pause_turn
+    is continued automatically up to a guard limit. A refusal raises
+    ModelRefusal before any content is read. Kept minimal on purpose — harden
+    per-call options (streaming for long outputs, retries) as real workloads
+    land."""
 
     def __init__(
         self,
         routing: dict[str, str] | None = None,
+        effort: dict[str, str] | None = None,
         max_tokens: int = 16000,
         max_continuations: int = 5,
     ) -> None:
@@ -111,6 +155,7 @@ class AnthropicModelClient:
 
         self._client = anthropic.Anthropic()
         self.routing = routing or dict(DEFAULT_ROUTING)
+        self.effort = effort or dict(DEFAULT_EFFORT)
         self.max_tokens = max_tokens
         self.max_continuations = max_continuations
 
@@ -126,15 +171,21 @@ class AnthropicModelClient:
             model=model, max_tokens=self.max_tokens, system=system,
             thinking={"type": "adaptive"},
         )
+        if effort := self.effort.get(tier):
+            kwargs["output_config"] = {"effort": effort}
         if tool_defs:
             kwargs["tools"] = tool_defs
 
         input_tokens = output_tokens = 0
+        usd = 0.0
         response = None
         for _ in range(self.max_continuations + 1):
             response = self._client.messages.create(messages=messages, **kwargs)
             input_tokens += response.usage.input_tokens
             output_tokens += response.usage.output_tokens
+            # Price each request on its own: some rates depend on prompt size.
+            usd += _estimate_usd(model, response.usage.input_tokens,
+                                 response.usage.output_tokens)
             if response.stop_reason != "pause_turn":
                 break
             # Server-side tool loop hit its iteration limit — re-send the turn
@@ -142,14 +193,29 @@ class AnthropicModelClient:
             messages = [{"role": "user", "content": prompt},
                         {"role": "assistant", "content": response.content}]
 
+        stop_reason = response.stop_reason or "end_turn"
+        if stop_reason == "refusal":
+            # Content is empty (declined up front) or partial (declined
+            # mid-answer) — never read it as output. stop_details can be None.
+            details = getattr(response, "stop_details", None)
+            raise ModelRefusal(
+                model,
+                category=getattr(details, "category", None),
+                explanation=getattr(details, "explanation", None),
+                response=ModelResponse(
+                    text="", model=model, input_tokens=input_tokens,
+                    output_tokens=output_tokens, usd=usd, stop_reason=stop_reason,
+                ),
+            )
+
         text = "".join(b.text for b in response.content if b.type == "text")
         return ModelResponse(
             text=text,
             model=model,
             input_tokens=input_tokens,
             output_tokens=output_tokens,
-            usd=_estimate_usd(model, input_tokens, output_tokens),
-            stop_reason=response.stop_reason or "end_turn",
+            usd=usd,
+            stop_reason=stop_reason,
         )
 
 
@@ -214,5 +280,10 @@ class OllamaModelClient:
 
 
 def _estimate_usd(model: str, input_tokens: int, output_tokens: int) -> float:
+    """Estimated $ for ONE request (some rates step up with that request's
+    prompt size). Unknown models are priced at Opus rates — over, not under."""
     in_price, out_price = _PRICING.get(model, (5.00, 25.00))
+    long_prompt = _LONG_PROMPT_PRICING.get(model)
+    if long_prompt and input_tokens > long_prompt[0]:
+        in_price, out_price = long_prompt[1], long_prompt[2]
     return input_tokens / 1_000_000 * in_price + output_tokens / 1_000_000 * out_price

@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from hive.adapter import BusinessAdapter
 from hive.agents.base import Agent, AgentContext
 from hive.agents.maker import MakerAgent
-from hive.agents.model import ModelClient
+from hive.agents.model import ModelClient, ModelRefusal
 from hive.agents.research import ResearchAgent
 from hive.artifacts import Artifact, Deliverable, Escalation, EscalationReason, Plan, PlanStep
 from hive.events.bus import Event
@@ -185,6 +185,20 @@ class Coordinator(Agent):
                               f"{exc.rounds} rework(s). Accept the latest attempt manually, "
                               f"adjust the SOP, or cancel?"),
                     context=exc.feedback[:1000],
+                )
+            )
+        except ModelRefusal as exc:
+            # The model declined (content empty or partial — never used). HIVE
+            # doesn't silently retry on another model: the owner decides.
+            transition(job, JobState.ESCALATED)
+            job.error = str(exc)
+            self.escalations.raise_escalation(
+                self.escalate(
+                    ctx, reason=EscalationReason.MODEL_REFUSAL,
+                    question=(f"Job {job.id}: {exc.model} declined the request "
+                              f"(category: {exc.category or 'unspecified'}). Rephrase the "
+                              f"request, route this tier to another model, or cancel?"),
+                    context=exc.explanation or "",
                 )
             )
         finally:

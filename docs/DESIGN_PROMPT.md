@@ -225,7 +225,7 @@ Who works here, and on what brain.
 - Roster from `GET /adapter` → `agents[]`:
   `{ name, tier, model, tools[], steps[] }`.
 - One card per agent: name, `tier` chip, **the model it runs on** (`model`,
-  e.g. `claude-opus-4-8` / `claude-sonnet-5` — make the model prominent),
+  e.g. `claude-opus-5-5` / `claude-sonnet-5-5` — make the model prominent),
   its least-privilege `tools` list, and the workflow `steps` it owns
   (e.g. `lead_to_proposal.enrich`).
 - Mark the `coordinator` entry visually as the orchestrator (crown/orb motif —
@@ -289,10 +289,10 @@ UI-editable yet except the kill switch (which lives in the shared header).
 - From `GET /system` →
   ```
   { "adapter": "...", "use_llm": false,
-    "model_routing": { "planner":"claude-opus-4-8",
-                       "specialist":"claude-sonnet-5",
-                       "extractor":"claude-haiku-4-5",
-                       "frontier":"claude-fable-5" },
+    "model_routing": { "planner":"claude-opus-5-5",
+                       "specialist":"claude-sonnet-5-5",
+                       "extractor":"claude-haiku-5-5",
+                       "frontier":"claude-fable-5-2" },
     "policies": { "gated_actions":[...],
                   "budgets": {"per_job": {...}, "global_daily": {...}},
                   "autonomy": {...}, "escalation": {...} },

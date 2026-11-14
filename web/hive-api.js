@@ -20,21 +20,21 @@
 
   /* ---------------- static config ---------------- */
   var agents = [
-    { name: 'coordinator', tier: 'coordinator', model: 'claude-opus-4-8',
+    { name: 'coordinator', tier: 'coordinator', model: 'claude-opus-5-5',
       tools: ['plan', 'review', 'delegate', 'escalate'], steps: [] },
-    { name: 'scout', tier: 'specialist', model: 'claude-sonnet-5',
+    { name: 'scout', tier: 'specialist', model: 'claude-sonnet-5-5',
       tools: ['web_search', 'crm_lookup', 'read_vault'],
       steps: ['lead_to_proposal.enrich', 'support_triage.classify'] },
-    { name: 'scribe', tier: 'specialist', model: 'claude-sonnet-5',
+    { name: 'scribe', tier: 'specialist', model: 'claude-sonnet-5-5',
       tools: ['write_draft', 'read_vault'],
       steps: ['lead_to_proposal.draft', 'content_pipeline.write', 'support_triage.respond'] },
-    { name: 'ledger', tier: 'specialist', model: 'claude-haiku-4-5',
+    { name: 'ledger', tier: 'specialist', model: 'claude-haiku-5-5',
       tools: ['read_ledger', 'price_quote', 'charge_card'],
       steps: ['lead_to_proposal.price', 'invoice_run.compile', 'invoice_run.charge'] },
-    { name: 'envoy', tier: 'specialist', model: 'claude-sonnet-5',
+    { name: 'envoy', tier: 'specialist', model: 'claude-sonnet-5-5',
       tools: ['send_email', 'publish_cms'],
       steps: ['lead_to_proposal.send', 'content_pipeline.publish'] },
-    { name: 'sentinel', tier: 'frontier', model: 'claude-fable-5',
+    { name: 'sentinel', tier: 'frontier', model: 'claude-fable-5-2',
       tools: ['deep_research', 'synthesize'],
       steps: ['content_pipeline.research'] }
   ];
@@ -610,7 +610,7 @@
     // ---- stubs for the other pages (kept consistent for later) ----
     if (url === '/system') return ok({
       adapter: ADAPTER, use_llm: false,
-      model_routing: { planner: 'claude-opus-4-8', specialist: 'claude-sonnet-5', extractor: 'claude-haiku-4-5', frontier: 'claude-fable-5' },
+      model_routing: { planner: 'claude-opus-5-5', specialist: 'claude-sonnet-5-5', extractor: 'claude-haiku-5-5', frontier: 'claude-fable-5-2' },
       policies: {
         gated_actions: ['send', 'spend', 'publish', 'contract', 'live_settings'],
         budgets: { per_job: { steps: 12, tokens: 120000, usd: 5 }, global_daily: { tokens: 4000000, usd: 120 } },

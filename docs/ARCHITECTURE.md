@@ -45,7 +45,7 @@ Event ──▶ EventBus ──▶ Coordinator ──▶ Job (FSM, SQLite)
 | Budgets + kill switch (§10, §11.7) | `policy/budgets.py` | steps/tokens/$ caps, pause-and-escalate, global switch |
 | Injection fencing (§11.2) | `fencing.py` | wraps all trigger payloads before prompts; escape attempts neutralized |
 | Memory fabric (§4) | `memory/` | semantic vault (path-safe), episodic queries over jobs DB, procedural SOP loader |
-| Multi-model routing (§9) | `agents/model.py` | tiers: planner → Opus, specialist → Sonnet, extractor → Haiku, frontier → Fable (owner-gated); adaptive thinking on. Three backends: `stub` ($0, canned), `ollama` ($0, real local inference — dev/free tier; no server-side tools), `anthropic` (live, paid) |
+| Multi-model routing (§9) | `agents/model.py` | tiers: planner → Opus 5.5, specialist → Sonnet 5.5, extractor → Haiku 5.5, frontier → Fable 5.2 (owner-gated); adaptive thinking on, effort set per tier. Three backends: `stub` ($0, canned), `ollama` ($0, real local inference — dev/free tier; no server-side tools), `anthropic` (live, paid) |
 | Action layer (§4) | `actions/registry.py` | server-side tools only for P0 — `web_search` (Anthropic-hosted, max_uses-capped); least privilege enforced at the agent chokepoint |
 | Owner voice (§3, P4 pulled fwd) | `voice/backends.py` + `api` `/voice/*` `/brief` + `web/hive-voice.js` | hands-free owner channel: Whisper STT + Kokoro TTS behind a `stub`/`local` backend (mirrors model backends); floating browser widget (push-to-talk, intent routing, approval-review with read-back+confirm). Agent phone-calls still deferred. Spec: `docs/superpowers/specs/2026-07-08-hive-voice-design.md`. Hardened via an adversarial review (see below). |
 | Traces (§9) | `observability/trace.py` | JSONL per job; tokens + $ on every model call |
@@ -152,8 +152,12 @@ unauthenticated by design. Revisit if HIVE ever becomes multi-user/hosted.
    `budgets.global_daily.max_usd`; at/over the cap the job is refused at
    QUEUED → ESCALATED with zero model calls, and the owner is asked to raise
    the cap or wait. `/system` reports `spend_today_usd` vs the cap.
-6. **`AnthropicModelClient` is minimal** — non-streaming, default effort;
-   handles server-tool `pause_turn` continuations (guarded). Add streaming
+6. **`AnthropicModelClient` is minimal** — non-streaming; effort sent
+   explicitly per tier (`DEFAULT_EFFORT`, set to each model's API default —
+   untuned until real evals run); handles server-tool `pause_turn`
+   continuations (guarded). A refusal (`stop_reason: "refusal"`) raises
+   `ModelRefusal`: the call's tokens are still charged, and the job escalates
+   to the owner (`model_refusal`) — no automatic fallback to another model. Add streaming
    for long outputs and structured outputs (`output_config.format`) when the
    Maker produces schema'd artifacts via LLM. **Still never exercised against
    the live API** — first `HIVE_USE_LLM=1` run may need a tweak.

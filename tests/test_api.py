@@ -101,16 +101,16 @@ def test_digest(client):
 def test_adapter_exposes_agent_roster(client):
     agents = {a["name"]: a for a in client.get("/adapter").json()["agents"]}
     assert agents["coordinator"]["tier"] == "planner"
-    assert agents["coordinator"]["model"] == "claude-opus-4-8"
-    assert agents["research"]["model"] == "claude-sonnet-5"
+    assert agents["coordinator"]["model"] == "claude-opus-5-5"
+    assert agents["research"]["model"] == "claude-sonnet-5-5"
     assert agents["research"]["tools"] == ["vault_read"]
     assert "lead_to_proposal.enrich" in agents["research"]["steps"]
 
 
 def test_system_settings_readonly(client):
     system = client.get("/system").json()
-    assert system["model_routing"]["planner"] == "claude-opus-4-8"
-    assert system["model_routing"]["frontier"] == "claude-fable-5"
+    assert system["model_routing"]["planner"] == "claude-opus-5-5"
+    assert system["model_routing"]["frontier"] == "claude-fable-5-2"
     assert "send" in system["policies"]["gated_actions"]
     assert system["use_llm"] is False
 

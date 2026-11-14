@@ -14,8 +14,9 @@ from __future__ import annotations
 from typing import Any
 
 # HIVE tool name -> Anthropic server-tool definition.
-# web_search_20260209 runs on Opus 4.8/4.7/4.6, Sonnet 5, Sonnet 4.6 — NOT on
-# Haiku. Grant web_search only to agents on the planner/specialist tiers.
+# web_search_20260209 runs on the routed Opus 5.5, Sonnet 5.5 and Fable 5.2 (and
+# Opus 4.6+, Sonnet 4.6+) — NOT on Haiku 5.5. Grant web_search only to agents
+# on the planner/specialist/frontier tiers, never the extractor tier.
 # max_uses bounds fan-out cost per call (PRD §10 discipline).
 ANTHROPIC_SERVER_TOOLS: dict[str, dict[str, Any]] = {
     "web_search": {"type": "web_search_20260209", "name": "web_search", "max_uses": 8},

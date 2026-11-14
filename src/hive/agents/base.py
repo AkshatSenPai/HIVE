@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 
 from hive.actions.registry import ToolNotPermitted
 from hive.artifacts import Artifact, Escalation, EscalationReason
-from hive.agents.model import ModelClient, ModelResponse
+from hive.agents.model import ModelClient, ModelRefusal, ModelResponse
 from hive.observability.trace import TraceWriter
 from hive.policy.budgets import Budget, KillSwitch
 
@@ -47,20 +47,33 @@ class Agent:
         if denied:
             raise ToolNotPermitted(self.name, denied)  # PRD §11.3, hard stop
         system = f"{self.role_prompt}\n\nBusiness profile:\n{ctx.profile}"
-        response = ctx.model.complete(self.tier, system, prompt, tools=requested)
+        try:
+            response = ctx.model.complete(self.tier, system, prompt, tools=requested)
+        except ModelRefusal as refusal:
+            # A declined call still consumed tokens — attribute them, then let
+            # the coordinator escalate (no retry on another model, no guessing).
+            self._account(ctx, refusal.response, requested, prompt, event="model_refusal",
+                          extra={"category": refusal.category,
+                                 "explanation": refusal.explanation})
+            raise
+        self._account(ctx, response, requested, prompt, event="model_call")
+        return response
+
+    def _account(self, ctx: AgentContext, response: ModelResponse, tools: list[str],
+                 prompt: str, event: str, extra: dict | None = None) -> None:
+        """Charge a model call's tokens/$ to the job budget and trace it."""
         ctx.budget.charge_tokens(response.total_tokens, response.usd)
         ctx.trace.record(
             ctx.job_id,
-            "model_call",
+            event,
             agent=self.name,
             payload={
                 "tier": self.tier, "model": response.model,
-                "tools": requested, "prompt": prompt[:200],
+                "tools": tools, "prompt": prompt[:200], **(extra or {}),
             },
             tokens=response.total_tokens,
             usd=response.usd,
         )
-        return response
 
     def escalate(self, ctx: AgentContext, reason: EscalationReason, question: str, context: str = "") -> Escalation:
         escalation = Escalation(

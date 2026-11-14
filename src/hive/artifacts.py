@@ -82,6 +82,7 @@ class EscalationReason(str, Enum):
     LOW_CONFIDENCE = "low_confidence"
     OUT_OF_WORKFLOW = "out_of_workflow"
     BUDGET_EDGE = "budget_edge"
+    MODEL_REFUSAL = "model_refusal"  # the model declined (stop_reason "refusal")
 
 
 class Escalation(Artifact):
