@@ -41,11 +41,19 @@ def test_default_voice_backend_is_stub(tmp_path):
     assert rt.voice.ready is True
 
 
-def test_local_backend_selected_but_not_ready_without_models(tmp_path):
+def test_local_backend_ready_reflects_dep_availability(tmp_path):
     rt = make_runtime(tmp_path, voice_backend="local")
     assert isinstance(rt.voice, LocalVoiceBackend)
-    # models aren't installed here — ready must be False, never crash
-    assert rt.voice.ready is False
+    # `ready` = the voice packages (STT + TTS + WAV I/O) all importable; it must be
+    # a bool and never raise, whether or not the [voice] extra is installed here.
+    import importlib.util as u
+
+    expected = all(
+        u.find_spec(pkg) is not None
+        for pkg in ("faster_whisper", "kokoro", "soundfile")
+    )
+    assert isinstance(rt.voice.ready, bool)
+    assert rt.voice.ready is expected
 
 
 def test_make_voice_backend_from_config(tmp_path):
@@ -165,3 +173,32 @@ def test_voice_transcribe_endpoint(tmp_path):
     resp = client.post("/voice/transcribe", content=wav, headers={"content-type": "audio/wav"})
     assert resp.status_code == 200
     assert resp.json()["text"] == "review approvals"
+
+
+# -- local backend round-trip (real models; auto-skips without the [voice] extra) --
+
+
+def test_local_roundtrip_kokoro_to_whisper():
+    """text -> Kokoro (TTS) -> WAV -> Whisper (STT) -> text. Verifies the real
+    local pipeline with no live mic. Auto-skips unless the [voice] extra is
+    installed (a Python 3.11 venv); the first run downloads the models from HF."""
+    import pytest
+
+    pytest.importorskip("faster_whisper")
+    pytest.importorskip("kokoro")
+    pytest.importorskip("soundfile")
+
+    backend = LocalVoiceBackend(whisper_model="base", kokoro_voice="af_heart")
+    assert backend.ready is True
+
+    phrase = "the quick brown fox jumps over the lazy dog"
+    try:  # first run downloads models from HuggingFace — skip (don't fail) if unreachable
+        wav = backend.speak(phrase)
+        heard = backend.transcribe(wav).lower()
+    except Exception as exc:  # noqa: BLE001 — a network/model-load failure isn't a code defect
+        pytest.skip(f"voice models unavailable: {type(exc).__name__}: {exc}")
+
+    assert wav[:4] == b"RIFF" and wav[8:12] == b"WAVE"
+    # Whisper won't be word-perfect; assert a few distinctive words survive.
+    hits = sum(word in heard for word in ("quick", "brown", "fox", "lazy", "dog"))
+    assert hits >= 3, f"round-trip lost too much: {heard!r}"

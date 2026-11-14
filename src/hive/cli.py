@@ -31,6 +31,18 @@ from hive.governance.digest import build_digest
 from hive.runtime import Runtime
 
 
+def _load_dotenv() -> None:
+    """Load the repo-root `.env` into os.environ before any `from_env()` runs, so
+    a pasted `.env` configures HIVE (voice backend, keys, …). Shell vars win
+    (override=False). No-op if python-dotenv or the file is absent — nothing here
+    is required, and unit tests (which never call main()) are untouched."""
+    try:
+        from dotenv import load_dotenv
+    except ImportError:
+        return
+    load_dotenv(Path(__file__).resolve().parents[2] / ".env", override=False)
+
+
 def _runtime(args: argparse.Namespace) -> Runtime:
     config = HiveConfig.from_env()
     if getattr(args, "adapter", None):
@@ -244,6 +256,7 @@ def main(argv: list[str] | None = None) -> int:
     # Windows consoles often default to cp1252; artifacts are UTF-8 text.
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    _load_dotenv()  # let a repo-root .env configure HIVE (voice backend, keys, …)
     parser = argparse.ArgumentParser(prog="hive", description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--adapter", "-a", default=None,
