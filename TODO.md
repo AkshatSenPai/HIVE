@@ -86,6 +86,6 @@ sources (file inbox · token-gated webhook) · eval harness w/ golden cases ·
 scheduled digest + delivery (vault + Telegram-ready) · FastAPI over the runtime ·
 8-page dashboard (live-wired, cross-fade transitions, hex-bee favicon) ·
 owner-channel voice (stub + real local Whisper/Kokoro, round-trip-verified,
-hardened). Prior work pushed to github.com/AkshatSenPai/HIVE; the 2026-07-11
-local-voice enablement (kokoro package + 3.11 venv) is on the working tree, not
-yet committed.
+hardened). All of it is on `main` at github.com/AkshatSenPai/HIVE — the
+2026-07-11 local-voice enablement (kokoro package + 3.11 venv) landed via PR #1
+(merged 2026-11-14).
