@@ -36,3 +36,49 @@ def test_kill_switch():
         switch.check()
     switch.release()
     switch.check()
+
+
+# -- per-job caps: policy ceiling, SOP may only tighten (HIVE build plan, 2026-11-16) --
+
+from pathlib import Path
+
+import yaml
+
+from hive.config import HiveConfig
+from hive.runtime import Runtime
+from tests.conftest import EXAMPLE_ADAPTER, REPO_ROOT
+
+
+@pytest.mark.parametrize("adapter", ["example", "venture-studio"])
+def test_shipped_caps_match_build_plan(adapter):
+    """$1/day (about Rs 94) and about Rs 30 per job, in every shipped adapter."""
+    policies = yaml.safe_load((REPO_ROOT / "adapters" / adapter / "policies.yaml").read_text(encoding="utf-8"))
+    assert policies["budgets"]["global_daily"]["max_usd"] == 1.0
+    assert policies["budgets"]["per_job"]["max_usd"] == 0.32
+
+
+def _coordinator_and_sop(tmp_path: Path):
+    rt = Runtime(HiveConfig(adapter_dir=EXAMPLE_ADAPTER, data_dir=tmp_path / ".hive"))
+    sop = next(iter(rt.adapter.workflows.values()))
+    return rt.coordinator, sop
+
+
+def test_sop_budget_can_tighten_the_job_cap(tmp_path):
+    coordinator, sop = _coordinator_and_sop(tmp_path)
+    budget = coordinator._job_budget(sop.model_copy(update={"budget": {"max_usd": 0.10, "max_steps": 5}}))
+    assert budget.max_usd == 0.10
+    assert budget.max_steps == 5
+
+
+def test_sop_budget_cannot_raise_the_job_cap(tmp_path):
+    coordinator, sop = _coordinator_and_sop(tmp_path)
+    budget = coordinator._job_budget(sop.model_copy(update={"budget": {"max_usd": 5.0, "max_tokens": 10**9}}))
+    assert budget.max_usd == 0.32  # policy ceiling holds
+    assert budget.max_tokens == 150_000
+
+
+def test_sop_budget_cannot_exceed_builtin_default(tmp_path):
+    coordinator, sop = _coordinator_and_sop(tmp_path)
+    del coordinator.adapter.policies["budgets"]["per_job"]["max_usd"]  # policy leaves it out
+    budget = coordinator._job_budget(sop.model_copy(update={"budget": {"max_usd": 50.0}}))
+    assert budget.max_usd == Budget().max_usd

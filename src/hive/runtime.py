@@ -8,6 +8,7 @@ from hive.adapter import BusinessAdapter, load_adapter
 from hive.agents.coordinator import Coordinator
 from hive.agents.model import (
     AnthropicModelClient,
+    ClaudeCodeModelClient,
     ModelClient,
     OllamaModelClient,
     StubModelClient,
@@ -56,6 +57,11 @@ class Runtime:
         backend = self.config.model_backend
         if backend == "anthropic":
             return AnthropicModelClient()
+        if backend == "claude_code":
+            return ClaudeCodeModelClient(
+                claude_bin=self.config.claude_bin,
+                timeout=self.config.claude_timeout_seconds,
+            )
         if backend == "ollama":
             return OllamaModelClient(
                 model=self.config.ollama_model, base_url=self.config.ollama_url

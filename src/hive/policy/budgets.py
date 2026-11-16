@@ -42,7 +42,7 @@ class Budget(BaseModel):
 
     max_steps: int = 40
     max_tokens: int = 200_000
-    max_usd: float = 2.0
+    max_usd: float = 0.32  # about Rs 30: the fallback if a policy leaves the cap out
 
     steps: int = 0
     tokens: int = 0

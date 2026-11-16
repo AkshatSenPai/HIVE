@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 
 from hive.actions.registry import ToolNotPermitted
 from hive.artifacts import Artifact, Escalation, EscalationReason
-from hive.agents.model import ModelClient, ModelRefusal, ModelResponse
+from hive.agents.model import ModelClient, ModelRefusal, ModelResponse, ModelUnavailable
 from hive.observability.trace import TraceWriter
 from hive.policy.budgets import Budget, KillSwitch
 
@@ -55,6 +55,12 @@ class Agent:
             self._account(ctx, refusal.response, requested, prompt, event="model_refusal",
                           extra={"category": refusal.category,
                                  "explanation": refusal.explanation})
+            raise
+        except ModelUnavailable as exc:
+            # Nothing came back (CLI missing, plan limit, timeout): no tokens to
+            # charge, but the attempt is traced before the coordinator escalates.
+            ctx.trace.record(ctx.job_id, "model_unavailable", agent=self.name,
+                             payload={"tier": self.tier, "error": str(exc)[:300]})
             raise
         self._account(ctx, response, requested, prompt, event="model_call")
         return response

@@ -20,10 +20,15 @@ class HiveConfig(BaseModel):
     web_dir: Path = Field(default_factory=lambda: _repo_root() / "web")  # frontend served same-origin
     vault_override: Path | None = None  # point at an existing Obsidian vault folder
     # Model backend: "stub" (offline canned, $0) · "ollama" (local models, $0)
-    # · "anthropic" (live API, costs money, needs ANTHROPIC_API_KEY)
+    # · "claude_code" (real Claude models through the local `claude` CLI, on the
+    #   owner's Claude plan — no API key) · "anthropic" (live API, costs money,
+    #   needs ANTHROPIC_API_KEY). claude_code and anthropic share the same model
+    #   routing and effort, so moving from the plan to the API is one setting.
     model_backend: str = "stub"
     ollama_model: str = "mistral:7b-instruct-q4_K_M"
     ollama_url: str = "http://localhost:11434"
+    claude_bin: str = "claude"            # the Claude Code CLI (name on PATH, or a full path)
+    claude_timeout_seconds: float = 600.0  # per call; web-search research turns can be slow
     # Event sources
     inbox_event_type: str = "lead.new"  # event type for bare .txt/.md inbox drops
     inbox_poll_seconds: float = 5.0
@@ -91,13 +96,17 @@ class HiveConfig(BaseModel):
         if vault := os.environ.get("HIVE_VAULT_DIR"):
             kwargs["vault_override"] = Path(vault)
         if backend := os.environ.get("HIVE_MODEL_BACKEND"):
-            kwargs["model_backend"] = backend.lower()
+            kwargs["model_backend"] = backend.lower().replace("-", "_")  # claude-code == claude_code
         elif os.environ.get("HIVE_USE_LLM", "").lower() in ("1", "true", "yes"):
             kwargs["model_backend"] = "anthropic"  # back-compat
         if om := os.environ.get("HIVE_OLLAMA_MODEL"):
             kwargs["ollama_model"] = om
         if ou := os.environ.get("HIVE_OLLAMA_URL"):
             kwargs["ollama_url"] = ou
+        if cb := os.environ.get("HIVE_CLAUDE_BIN"):
+            kwargs["claude_bin"] = cb
+        if ct := os.environ.get("HIVE_CLAUDE_TIMEOUT"):
+            kwargs["claude_timeout_seconds"] = float(ct)
         if iet := os.environ.get("HIVE_INBOX_EVENT_TYPE"):
             kwargs["inbox_event_type"] = iet
         if token := os.environ.get("HIVE_WEBHOOK_TOKEN"):

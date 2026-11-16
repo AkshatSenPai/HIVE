@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from hive.adapter import BusinessAdapter
 from hive.agents.base import Agent, AgentContext
 from hive.agents.maker import MakerAgent
-from hive.agents.model import ModelClient, ModelRefusal
+from hive.agents.model import ModelClient, ModelRefusal, ModelUnavailable
 from hive.agents.research import ResearchAgent
 from hive.artifacts import Artifact, Deliverable, Escalation, EscalationReason, Plan, PlanStep
 from hive.events.bus import Event
@@ -151,7 +151,7 @@ class Coordinator(Agent):
                                   payload={"reason": "global_daily_budget", "cap": daily_cap})
                 return job
 
-        budget = Budget(**self.adapter.policies.get("budgets", {}).get("per_job", {}))
+        budget = self._job_budget(sop)
         ctx = AgentContext(
             job_id=job.id, model=self.model, budget=budget,
             kill_switch=self.kill_switch, trace=self.trace,
@@ -201,11 +201,38 @@ class Coordinator(Agent):
                     context=exc.explanation or "",
                 )
             )
+        except ModelUnavailable as exc:
+            # The backend couldn't run the call (plan limit, signed out, CLI
+            # missing, timeout). Stop and ask; never fall back silently.
+            transition(job, JobState.ESCALATED)
+            job.error = str(exc)
+            self.escalations.raise_escalation(
+                self.escalate(
+                    ctx, reason=EscalationReason.MODEL_UNAVAILABLE,
+                    question=(f"Job {job.id}: the model backend couldn't run the call "
+                              f"({exc}). Retry later (for example after a plan limit "
+                              f"resets), switch HIVE_MODEL_BACKEND, or cancel?"),
+                )
+            )
         finally:
             job.spend_tokens = budget.tokens
             job.spend_usd = round(budget.usd, 6)
             self.store.save_job(job)
         return job
+
+    def _job_budget(self, sop: SOP) -> Budget:
+        """Per-job caps: policies.yaml `per_job` is the ceiling; the SOP's own
+        `budget:` block may only tighten it, never raise it."""
+        # Built-in Budget defaults fill any cap the policy leaves out, so an SOP
+        # can never lift a job above them either.
+        policy = Budget(**self.adapter.policies.get("budgets", {}).get("per_job", {}))
+        keys = ("max_steps", "max_tokens", "max_usd")
+        caps = {key: getattr(policy, key) for key in keys}
+        for key in keys:
+            sop_cap = sop.budget.get(key)
+            if sop_cap is not None:
+                caps[key] = min(caps[key], sop_cap)
+        return Budget(**caps)
 
     # -- phases ----------------------------------------------------------------
 

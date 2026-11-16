@@ -40,7 +40,7 @@ def test_digest_shows_daily_spend_and_cap(tmp_path):
     rt.trigger(Event(type="lead.new", metadata={"subject": "Acme", "raw_context": "x"}))
     text = build_digest(rt.store, rt.adapter.policies)
     assert "spend today: $" in text
-    assert "/ $20.0 daily cap" in text  # from example policies.yaml
+    assert "/ $1.0 daily cap" in text  # from example policies.yaml
 
 
 def test_digest_surfaces_improvement_proposals(tmp_path):

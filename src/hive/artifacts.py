@@ -83,6 +83,7 @@ class EscalationReason(str, Enum):
     OUT_OF_WORKFLOW = "out_of_workflow"
     BUDGET_EDGE = "budget_edge"
     MODEL_REFUSAL = "model_refusal"  # the model declined (stop_reason "refusal")
+    MODEL_UNAVAILABLE = "model_unavailable"  # backend couldn't run (CLI missing, plan limit, error)
 
 
 class Escalation(Artifact):

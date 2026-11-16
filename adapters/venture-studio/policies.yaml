@@ -10,12 +10,13 @@ review:
   max_reworks: 1              # rework rounds before stop-and-ask (never accept by exhaustion)
 
 budgets:
+  # USD; rupee figures at about Rs 94 per dollar (HIVE build plan, 2026-11-16).
   per_job:
     max_steps: 20
     max_tokens: 150000
-    max_usd: 1.0
+    max_usd: 0.32             # about Rs 30 per job; a workflow's own budget can only lower it
   global_daily:
-    max_usd: 20.0
+    max_usd: 1.0              # about Rs 94 a day; worst case about Rs 2,800 a month
 
 escalation:
   stop_and_ask_on: [ambiguity, missing_info, low_confidence, out_of_workflow, budget_edge]

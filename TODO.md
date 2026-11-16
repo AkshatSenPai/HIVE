@@ -42,7 +42,7 @@ HuggingFace. What's left:
 ## Part 2 — What's left in the PROJECT
 
 ### The one thing that matters most
-- [ ] 💳 **First live-model run.** The entire system has only ever run on the stub or local Ollama — *never against a real frontier model*. One real market scan on Sonnet (a few cents) converts "architecturally complete" into "proven." This is the biggest validation gap. Blocked on a funded API key.
+- [ ] 💳 **First live-model run.** The entire system has only ever run on the stub or local Ollama — *never against a real frontier model*. One real market scan on Sonnet (a few cents) converts "architecturally complete" into "proven." This is the biggest validation gap. **Unblocked 2026-11-16:** the `claude_code` backend runs on the Claude plan (`HIVE_MODEL_BACKEND=claude_code`); a funded API key is only needed later.
 - [ ] 💳 The PRD's actual **P0 exit bar** is unmet: "10 real jobs, ≤2 owner touches each, zero ungated actions, cost in class" — needs real models + a real business + real volume. The machine is done; the *proving* isn't.
 
 ### Free, buildable now (P1 remainder / polish)

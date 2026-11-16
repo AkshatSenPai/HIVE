@@ -13,7 +13,7 @@
   hive trace <job_id>            dump a job's trace
   hive serve [--host --port]     run the HTTP API + UI + inbox watcher
   hive watch [--interval N]      watch <data_dir>/inbox for dropped files
-  hive eval [--workflow N] [--backend stub|ollama|anthropic]
+  hive eval [--workflow N] [--backend stub|ollama|claude_code|anthropic]
                                  run the adapter's golden eval cases
 """
 
@@ -300,7 +300,7 @@ def main(argv: list[str] | None = None) -> int:
 
     p_eval = sub.add_parser("eval")
     p_eval.add_argument("--workflow", default=None)
-    p_eval.add_argument("--backend", choices=["stub", "ollama", "anthropic"], default=None)
+    p_eval.add_argument("--backend", choices=["stub", "ollama", "claude_code", "anthropic"], default=None)
     p_eval.set_defaults(func=cmd_eval)
 
     p_watch = sub.add_parser("watch")

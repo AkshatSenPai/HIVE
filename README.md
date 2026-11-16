@@ -137,8 +137,17 @@ something → researched shortlist → you pick at a checkpoint,
 `adapters/venture-studio`). Both are plain SOPs — no special-case code.
 
 The demo uses a deterministic **stub model** so everything runs with zero API
-cost. To use real models, `pip install -e ".[llm]"`, set `ANTHROPIC_API_KEY`,
-and set `HIVE_USE_LLM=1`.
+cost. Two ways to run on real Claude models — same model routing, effort and
+cost tracking, so you can start on one and switch later with one setting:
+
+- **Your Claude plan (testing):** `HIVE_MODEL_BACKEND=claude_code`. Each model
+  call runs through the `claude` CLI (Claude Code, signed in to your plan) in
+  headless safe mode: no CLAUDE.md, plugins, hooks or MCP servers, only the
+  tools the agent is granted, in an empty temp folder, and with any API key
+  removed so usage always counts against the plan, not API credits. Spend in
+  HIVE is the API-equivalent cost Claude Code reports, so the caps mean the same.
+- **The paid API (later):** `pip install -e ".[llm]"`, set `ANTHROPIC_API_KEY`,
+  and `HIVE_MODEL_BACKEND=anthropic`.
 
 ## Layout
 
@@ -167,10 +176,12 @@ tests/                  # FSM, budgets, gates, fencing, adapter, pipeline, API
 | `HIVE_DATA_DIR`   | where jobs DB / traces / vault live       | `.hive/`           |
 | `HIVE_VAULT_DIR`  | point semantic memory at an existing Obsidian vault | `.hive/vault` |
 | `HIVE_WEB_DIR`    | where the frontend pages live             | `web/`             |
-| `HIVE_MODEL_BACKEND` | `stub` (canned, $0) · `ollama` (local models, $0) · `anthropic` (live, paid) | `stub` |
+| `HIVE_MODEL_BACKEND` | `stub` (canned, $0) · `ollama` (local models, $0) · `claude_code` (real Claude models on your Claude plan) · `anthropic` (live API, paid) | `stub` |
 | `HIVE_OLLAMA_MODEL` | local model when backend is `ollama`    | `mistral:7b-instruct-q4_K_M` |
 | `HIVE_OLLAMA_URL` | Ollama server                             | `http://localhost:11434` |
-| `ANTHROPIC_API_KEY` | only needed when backend is `anthropic` | —                  |
+| `ANTHROPIC_API_KEY` | only needed when backend is `anthropic` (removed from the `claude` CLI's environment under `claude_code`) | — |
+| `HIVE_CLAUDE_BIN` | the Claude Code CLI, for `claude_code`      | `claude` (on PATH) |
+| `HIVE_CLAUDE_TIMEOUT` | seconds per `claude_code` call        | `600` |
 
 **Free real AI:** with [Ollama](https://ollama.com) installed,
 `HIVE_MODEL_BACKEND=ollama hive -a adapters/venture-studio ask "..."` runs the

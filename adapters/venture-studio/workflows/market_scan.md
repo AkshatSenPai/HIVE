@@ -7,7 +7,7 @@ sla_hours: 24
 budget:
   max_steps: 20
   max_tokens: 150000
-  max_usd: 1.0
+  max_usd: 0.32
 steps:
   - id: scan
     agent: research

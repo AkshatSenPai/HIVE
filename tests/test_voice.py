@@ -105,7 +105,7 @@ def test_brief_reports_pending_approval_and_spend(tmp_path):
     assert "1 approval waiting" in text
     assert "Waiting for you:" in text
     assert "daily cap" in text  # example adapter sets a global_daily cap
-    assert "cents" in text or "dollars" in text
+    assert "cent" in text or "dollar" in text  # "1 cent" / "a 1 dollar daily cap"
 
 
 def test_money_phrase_singular_and_bad_cap(tmp_path):

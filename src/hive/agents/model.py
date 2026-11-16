@@ -82,6 +82,13 @@ class ModelRefusal(Exception):
         super().__init__(f"{model} declined the request (category: {category or 'unspecified'})")
 
 
+class ModelUnavailable(Exception):
+    """The model backend couldn't serve the call at all: the `claude` CLI is
+    missing or signed out, a plan usage limit was hit, the call timed out, or
+    it returned an error. Nothing usable came back, so the coordinator
+    escalates to the owner instead of guessing or retrying elsewhere."""
+
+
 class ModelResponse(BaseModel):
     text: str
     model: str
@@ -216,6 +223,145 @@ class AnthropicModelClient:
             output_tokens=output_tokens,
             usd=usd,
             stop_reason=stop_reason,
+        )
+
+
+# HIVE tool name -> Claude Code built-in tool. Only tools listed here can ever
+# be switched on for a headless call; everything else stays off (PRD §11.3).
+# vault_read has no Claude Code equivalent yet, so granting it enables nothing.
+CLAUDE_CODE_TOOLS: dict[str, str] = {"web_search": "WebSearch"}
+
+# Environment variables that would make the `claude` CLI bill an API key
+# instead of the signed-in plan. Removed from the child process so this
+# backend can only ever run on the plan.
+_API_KEY_ENV = ("ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN")
+
+
+class ClaudeCodeModelClient:
+    """Runs each model call through the local `claude` CLI (Claude Code) in
+    headless mode, so HIVE uses the owner's Claude plan instead of a paid API
+    key. Same routing and effort tables as AnthropicModelClient, so switching
+    to the API later is one setting (HIVE_MODEL_BACKEND=anthropic).
+
+    Isolation — the call must not pick up the owner's own Claude Code setup:
+      * --safe-mode: no CLAUDE.md, skills, plugins, hooks, MCP servers or custom
+        agents (sign-in, model choice and built-in tools still work);
+        --strict-mcp-config and --disable-slash-commands on top of that.
+      * --tools: only the Claude Code tools mapped from the agent's granted
+        HIVE tools (web_search -> WebSearch); "" means no tools at all.
+      * --system-prompt replaces Claude Code's own system prompt with HIVE's.
+      * runs in a fresh empty temp folder, with --no-session-persistence;
+      * API-key variables are removed, so usage always counts against the plan.
+
+    Spend: `usd` is the API-equivalent cost Claude Code reports for the call
+    (total_cost_usd), so HIVE's caps keep the same meaning on both backends.
+    """
+
+    def __init__(
+        self,
+        routing: dict[str, str] | None = None,
+        effort: dict[str, str] | None = None,
+        claude_bin: str = "claude",
+        timeout: float = 600.0,
+        run=None,
+        which=None,
+    ) -> None:
+        import shutil
+        import subprocess
+
+        self.routing = routing or dict(DEFAULT_ROUTING)
+        self.effort = effort or dict(DEFAULT_EFFORT)
+        self.claude_bin = claude_bin
+        self.timeout = timeout
+        self._run = run or subprocess.run       # injectable for tests
+        self._which = which or shutil.which
+
+    def command(self, model: str, effort: str | None, system: str,
+                tools: list[str]) -> list[str]:
+        """The exact argv for one headless call (the prompt goes in on stdin)."""
+        enabled = [CLAUDE_CODE_TOOLS[t] for t in tools if t in CLAUDE_CODE_TOOLS]
+        argv = [
+            self.claude_bin, "-p",
+            "--output-format", "json",
+            "--model", model,
+            "--system-prompt", system,
+            "--safe-mode", "--strict-mcp-config", "--disable-slash-commands",
+            "--no-session-persistence",
+            "--tools", ",".join(enabled),
+        ]
+        if enabled:
+            argv += ["--allowedTools", ",".join(enabled)]
+        if effort:
+            argv += ["--effort", effort]
+        return argv
+
+    def complete(
+        self, tier: str, system: str, prompt: str, tools: list[str] | None = None
+    ) -> ModelResponse:
+        import json
+        import os
+        import subprocess
+        import tempfile
+
+        model = self.routing.get(tier, self.routing["specialist"])
+        binary = self._which(self.claude_bin)
+        if binary is None:
+            raise ModelUnavailable(
+                f"the `{self.claude_bin}` CLI was not found on PATH "
+                "(install Claude Code, or set HIVE_CLAUDE_BIN)")
+        argv = self.command(model, self.effort.get(tier), system, tools or [])
+        argv[0] = binary
+        env = {k: v for k, v in os.environ.items() if k not in _API_KEY_ENV}
+
+        with tempfile.TemporaryDirectory(prefix="hive-claude-") as workdir:
+            try:
+                proc = self._run(
+                    argv, input=prompt, capture_output=True, text=True,
+                    encoding="utf-8", errors="replace",
+                    timeout=self.timeout, cwd=workdir, env=env,
+                )
+            except subprocess.TimeoutExpired:
+                raise ModelUnavailable(
+                    f"{model} via Claude Code timed out after {self.timeout:.0f}s") from None
+            except OSError as exc:
+                raise ModelUnavailable(f"could not start the Claude Code CLI: {exc}") from exc
+
+        try:
+            data = json.loads(proc.stdout or "")
+        except json.JSONDecodeError:
+            detail = (proc.stderr or proc.stdout or "no output").strip()[:300]
+            raise ModelUnavailable(
+                f"Claude Code returned no result (exit {proc.returncode}): {detail}") from None
+        if not isinstance(data, dict):
+            raise ModelUnavailable(f"Claude Code returned unexpected output: {str(data)[:300]}")
+
+        usage = data.get("usage") or {}
+        input_tokens = sum(int(usage.get(k) or 0) for k in (
+            "input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"))
+        output_tokens = int(usage.get("output_tokens") or 0)
+        cost = data.get("total_cost_usd")
+        usd = float(cost) if cost is not None else _estimate_usd(model, input_tokens, output_tokens)
+        served = f"claude-code/{model}"
+
+        if data.get("stop_reason") == "refusal":
+            details = data.get("stop_details") or {}
+            raise ModelRefusal(
+                model, category=details.get("category"), explanation=details.get("explanation"),
+                response=ModelResponse(text="", model=served, input_tokens=input_tokens,
+                                       output_tokens=output_tokens, usd=usd,
+                                       stop_reason="refusal"),
+            )
+        if data.get("is_error") or proc.returncode != 0 or data.get("subtype") not in (None, "success"):
+            detail = str(data.get("result") or data.get("subtype") or proc.stderr or "error").strip()[:300]
+            raise ModelUnavailable(f"{model} via Claude Code failed: {detail}")
+
+        return ModelResponse(
+            text=str(data.get("result") or ""),
+            model=served,
+            input_tokens=input_tokens,
+            output_tokens=output_tokens,
+            usd=usd,
+            stop_reason=str(data.get("stop_reason") or "end_turn"),
         )
 
 
