@@ -11,10 +11,13 @@ review:
 
 budgets:
   # USD; rupee figures at about Rs 94 per dollar (HIVE build plan, 2026-11-16).
+  # A live market scan's research call alone is about $0.37 (first live run,
+  # 2026-11-16), so scans need more room than the example adapter's $0.32.
   per_job:
     max_steps: 20
-    max_tokens: 150000
-    max_usd: 0.32             # about Rs 30 per job; a workflow's own budget can only lower it
+    max_tokens: 1000000       # runaway guard only: counts cache re-reads and each web search's
+                              # Haiku request (about 13k tokens each), all cheap; max_usd is the real limit
+    max_usd: 0.75             # about Rs 70 per job; a workflow's own budget can only lower it
   global_daily:
     max_usd: 1.0              # about Rs 94 a day; worst case about Rs 2,800 a month
 

@@ -1,8 +1,8 @@
 """Research agent (PRD §5 v1 roster): enrichment and context briefs.
 
-Never sends anything. P0 gathers from the prompt context and the vault;
-web tools land in the action layer later and are consumed through the
-least-privilege toolset, not imported here.
+Never sends anything. Works from the trigger context and the SOP, plus
+server-side web search when the adapter grants it (through the
+least-privilege toolset, never imported here).
 """
 
 from __future__ import annotations
@@ -33,6 +33,12 @@ class ResearchAgent(Agent):
                 "\nSearch the web for current evidence; cite what you find. "
                 "Mark anything you could not verify as unverified."
             )
+        if instructions := task.get("instructions"):
+            # The SOP is the job description (adapter file, trusted — not
+            # fenced). Without it research doesn't know what the brief must hold.
+            step = task.get("step")
+            which = f" Do the '{step}' step." if step else ""
+            prompt += f"\n\nSOP instructions.{which}\n{instructions}"
         if raw_context:
             # Trigger payloads come from the outside world — always fenced.
             prompt += "\n\n" + fence(raw_context, source=task.get("source", "trigger"))
@@ -40,7 +46,10 @@ class ResearchAgent(Agent):
             # Coordinator review feedback (internal, trusted — not fenced).
             prompt += f"\n\nReviewer feedback on your previous attempt — address all of it:\n{feedback}"
         response = self.ask_model(ctx, prompt, tools=tools)
-        sources = [task.get("source", "trigger")] + (["web_search"] if tools else [])
+        # Only claim the web as a source when a search actually ran: a backend
+        # without server-side search (stub, Ollama) works from model memory.
+        searched = bool(tools) and response.web_searches > 0
+        sources = [task.get("source", "trigger")] + (["web_search"] if searched else [])
         return Brief(
             subject=subject,
             summary=response.text,

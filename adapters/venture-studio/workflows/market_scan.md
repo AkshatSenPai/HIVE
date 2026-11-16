@@ -6,8 +6,8 @@ description: Owner asks for market opportunities -> researched, ranked shortlist
 sla_hours: 24
 budget:
   max_steps: 20
-  max_tokens: 150000
-  max_usd: 0.32
+  max_tokens: 1000000
+  max_usd: 0.75
 steps:
   - id: scan
     agent: research

@@ -123,6 +123,38 @@ def test_parses_text_tokens_and_reported_cost():
     assert response.usd == pytest.approx(0.0123)  # API-equivalent cost from Claude Code
 
 
+def test_counts_searches_and_tokens_from_every_model():
+    """Shape seen live (2026-11-17): WebSearch runs as a separate Haiku request,
+    so its tokens and the search count are only in modelUsage; the top-level
+    usage shows the main model alone with 0 searches."""
+    payload = {
+        "usage": {"input_tokens": 4, "cache_creation_input_tokens": 2191,
+                  "cache_read_input_tokens": 2672, "output_tokens": 192,
+                  "server_tool_use": {"web_search_requests": 0, "web_fetch_requests": 0}},
+        "modelUsage": {
+            "claude-sonnet-5-5": {"inputTokens": 4, "outputTokens": 192, "cacheReadInputTokens": 2672,
+                                  "cacheCreationInputTokens": 2191, "webSearchRequests": 0},
+            "claude-haiku-5-5": {"inputTokens": 13122, "outputTokens": 691, "cacheReadInputTokens": 0,
+                                 "cacheCreationInputTokens": 0, "webSearchRequests": 1},
+        },
+        "total_cost_usd": 0.0226169,
+    }
+    run = FakeRun(stdout=_result(**payload))
+    response = make_client(run).complete("specialist", "sys", "scan", tools=["web_search"])
+    assert response.web_searches == 1
+    assert (response.input_tokens, response.output_tokens) == (4 + 2191 + 2672 + 13122, 192 + 691)
+    assert response.usd == pytest.approx(0.0226169)
+    assert response.model == "claude-code/claude-sonnet-5-5"  # the model HIVE asked for
+
+
+def test_falls_back_to_top_level_usage_without_model_usage():
+    usage = {"input_tokens": 40, "output_tokens": 7,
+             "server_tool_use": {"web_search_requests": 4, "web_fetch_requests": 0}}
+    run = FakeRun(stdout=_result(usage=usage))
+    assert make_client(run).complete("specialist", "sys", "scan", tools=["web_search"]).web_searches == 4
+    assert make_client(FakeRun(stdout=_result())).complete("specialist", "sys", "hi").web_searches == 0
+
+
 def test_estimates_cost_when_the_cli_reports_none():
     run = FakeRun(stdout=_result(total_cost_usd=None))
     assert make_client(run).complete("specialist", "sys", "hi").usd > 0

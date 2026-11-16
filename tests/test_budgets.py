@@ -49,12 +49,26 @@ from hive.runtime import Runtime
 from tests.conftest import EXAMPLE_ADAPTER, REPO_ROOT
 
 
-@pytest.mark.parametrize("adapter", ["example", "venture-studio"])
-def test_shipped_caps_match_build_plan(adapter):
-    """$1/day (about Rs 94) and about Rs 30 per job, in every shipped adapter."""
+@pytest.mark.parametrize("adapter, per_job", [
+    ("example", 0.32),         # about Rs 30
+    ("venture-studio", 0.75),  # about Rs 70: a live scan's research call alone is about $0.37
+])
+def test_shipped_caps_match_build_plan(adapter, per_job):
+    """$1/day (about Rs 94) in every shipped adapter; per-job cap sized to its work."""
     policies = yaml.safe_load((REPO_ROOT / "adapters" / adapter / "policies.yaml").read_text(encoding="utf-8"))
     assert policies["budgets"]["global_daily"]["max_usd"] == 1.0
-    assert policies["budgets"]["per_job"]["max_usd"] == 0.32
+    assert policies["budgets"]["per_job"]["max_usd"] == per_job
+
+
+def test_market_scan_budget_fits_under_its_policy():
+    """The scan's own budget is what applies (tighten-only), so it must not sit
+    below the policy by accident and starve a live scan."""
+    from hive.adapter import load_adapter
+    adapter = load_adapter(REPO_ROOT / "adapters" / "venture-studio")
+    sop = adapter.workflows["market_scan"]
+    per_job = adapter.policies["budgets"]["per_job"]
+    assert sop.budget["max_usd"] == per_job["max_usd"]
+    assert sop.budget["max_tokens"] == per_job["max_tokens"]
 
 
 def _coordinator_and_sop(tmp_path: Path):

@@ -277,6 +277,7 @@ class Coordinator(Agent):
                 "raw_context": job.context.get("raw_context", ""),
                 "source": job.context.get("source", "trigger"),
                 "kind": sop_step.output or sop_step.action,
+                "step": sop_step.id,
                 "instructions": sop.body,
             }
             for name in sop_step.inputs:

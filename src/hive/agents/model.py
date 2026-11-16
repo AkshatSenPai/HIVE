@@ -96,6 +96,10 @@ class ModelResponse(BaseModel):
     output_tokens: int = 0
     usd: float = 0.0
     stop_reason: str = "end_turn"
+    # Server-side web searches that actually ran during the call. Backends
+    # that can't search (stub, Ollama) leave it at 0, so a brief can say
+    # honestly whether anything was looked up.
+    web_searches: int = 0
 
     @property
     def total_tokens(self) -> int:
@@ -183,13 +187,15 @@ class AnthropicModelClient:
         if tool_defs:
             kwargs["tools"] = tool_defs
 
-        input_tokens = output_tokens = 0
+        input_tokens = output_tokens = web_searches = 0
         usd = 0.0
         response = None
         for _ in range(self.max_continuations + 1):
             response = self._client.messages.create(messages=messages, **kwargs)
             input_tokens += response.usage.input_tokens
             output_tokens += response.usage.output_tokens
+            server_tools = getattr(response.usage, "server_tool_use", None)
+            web_searches += int(getattr(server_tools, "web_search_requests", 0) or 0)
             # Price each request on its own: some rates depend on prompt size.
             usd += _estimate_usd(model, response.usage.input_tokens,
                                  response.usage.output_tokens)
@@ -212,6 +218,7 @@ class AnthropicModelClient:
                 response=ModelResponse(
                     text="", model=model, input_tokens=input_tokens,
                     output_tokens=output_tokens, usd=usd, stop_reason=stop_reason,
+                    web_searches=web_searches,
                 ),
             )
 
@@ -223,7 +230,29 @@ class AnthropicModelClient:
             output_tokens=output_tokens,
             usd=usd,
             stop_reason=stop_reason,
+            web_searches=web_searches,
         )
+
+
+def _claude_code_usage(data: dict) -> tuple[int, int, int]:
+    """(input tokens, output tokens, web searches) for one headless call.
+
+    Claude Code runs each WebSearch as its own request on a small model
+    (Haiku 5.5, seen 2026-11-17). Those tokens and the search count appear
+    only in the per-model `modelUsage` totals; the top-level `usage` covers
+    the main model alone and reports 0 searches. So sum `modelUsage` when
+    present. Cache writes and reads count as input."""
+    per_model = data.get("modelUsage")
+    if isinstance(per_model, dict) and per_model:
+        rows = [row for row in per_model.values() if isinstance(row, dict)]
+        total = lambda *keys: sum(int(row.get(k) or 0) for row in rows for k in keys)
+        return (total("inputTokens", "cacheCreationInputTokens", "cacheReadInputTokens"),
+                total("outputTokens"), total("webSearchRequests"))
+    usage = data.get("usage") or {}
+    input_tokens = sum(int(usage.get(k) or 0) for k in (
+        "input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"))
+    searches = int((usage.get("server_tool_use") or {}).get("web_search_requests") or 0)
+    return input_tokens, int(usage.get("output_tokens") or 0), searches
 
 
 # HIVE tool name -> Claude Code built-in tool. Only tools listed here can ever
@@ -335,10 +364,7 @@ class ClaudeCodeModelClient:
         if not isinstance(data, dict):
             raise ModelUnavailable(f"Claude Code returned unexpected output: {str(data)[:300]}")
 
-        usage = data.get("usage") or {}
-        input_tokens = sum(int(usage.get(k) or 0) for k in (
-            "input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens"))
-        output_tokens = int(usage.get("output_tokens") or 0)
+        input_tokens, output_tokens, web_searches = _claude_code_usage(data)
         cost = data.get("total_cost_usd")
         usd = float(cost) if cost is not None else _estimate_usd(model, input_tokens, output_tokens)
         served = f"claude-code/{model}"
@@ -349,7 +375,7 @@ class ClaudeCodeModelClient:
                 model, category=details.get("category"), explanation=details.get("explanation"),
                 response=ModelResponse(text="", model=served, input_tokens=input_tokens,
                                        output_tokens=output_tokens, usd=usd,
-                                       stop_reason="refusal"),
+                                       stop_reason="refusal", web_searches=web_searches),
             )
         if data.get("is_error") or proc.returncode != 0 or data.get("subtype") not in (None, "success"):
             detail = str(data.get("result") or data.get("subtype") or proc.stderr or "error").strip()[:300]
@@ -362,6 +388,7 @@ class ClaudeCodeModelClient:
             output_tokens=output_tokens,
             usd=usd,
             stop_reason=str(data.get("stop_reason") or "end_turn"),
+            web_searches=web_searches,
         )
 
 

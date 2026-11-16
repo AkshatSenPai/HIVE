@@ -67,19 +67,22 @@ class Agent:
 
     def _account(self, ctx: AgentContext, response: ModelResponse, tools: list[str],
                  prompt: str, event: str, extra: dict | None = None) -> None:
-        """Charge a model call's tokens/$ to the job budget and trace it."""
-        ctx.budget.charge_tokens(response.total_tokens, response.usd)
+        """Trace a model call, then charge its tokens/$ to the job budget.
+
+        Trace first: the charge raises BudgetExceeded when this call crosses a
+        cap, and the call that crossed it must still be on the record (it is
+        usually the most expensive one)."""
+        payload = {
+            "tier": self.tier, "model": response.model,
+            "tools": tools, "prompt": prompt[:200], **(extra or {}),
+        }
+        if tools:
+            payload["web_searches"] = response.web_searches
         ctx.trace.record(
-            ctx.job_id,
-            event,
-            agent=self.name,
-            payload={
-                "tier": self.tier, "model": response.model,
-                "tools": tools, "prompt": prompt[:200], **(extra or {}),
-            },
-            tokens=response.total_tokens,
-            usd=response.usd,
+            ctx.job_id, event, agent=self.name, payload=payload,
+            tokens=response.total_tokens, usd=response.usd,
         )
+        ctx.budget.charge_tokens(response.total_tokens, response.usd)
 
     def escalate(self, ctx: AgentContext, reason: EscalationReason, question: str, context: str = "") -> Escalation:
         escalation = Escalation(

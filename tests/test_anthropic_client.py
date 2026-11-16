@@ -109,6 +109,21 @@ def test_pause_turn_continues_and_prices_each_request(fake_sdk):
     assert response.usd == pytest.approx(expected)
 
 
+def test_counts_web_searches_across_continuations(fake_sdk):
+    first = _response(stop_reason="pause_turn", text="")
+    first.usage.server_tool_use = SimpleNamespace(web_search_requests=3)
+    second = _response(text="done")
+    second.usage.server_tool_use = SimpleNamespace(web_search_requests=2)
+    fake_sdk(first, second)
+    response = AnthropicModelClient().complete("specialist", "sys", "scan", tools=["web_search"])
+    assert response.web_searches == 5
+
+
+def test_no_server_tool_usage_means_no_searches(fake_sdk):
+    fake_sdk(_response())  # usage has no server_tool_use at all
+    assert AnthropicModelClient().complete("specialist", "sys", "hi").web_searches == 0
+
+
 def test_refusal_raises_with_category_and_spend(fake_sdk):
     details = SimpleNamespace(category="cyber", explanation="declined by classifier")
     fake_sdk(_response(stop_reason="refusal", text="partial answer", stop_details=details))

@@ -43,6 +43,13 @@ HuggingFace. What's left:
 
 ### The one thing that matters most
 - [ ] 💳 **First live-model run.** The entire system has only ever run on the stub or local Ollama — *never against a real frontier model*. One real market scan on Sonnet (a few cents) converts "architecturally complete" into "proven." This is the biggest validation gap. **Unblocked 2026-11-16:** the `claude_code` backend runs on the Claude plan (`HIVE_MODEL_BACKEND=claude_code`); a funded API key is only needed later.
+  - **First live scans ran 2026-11-16, and neither finished.** The request was the broad "viable apps" one. Both runs escalated on the per-job cap.
+    - Run 1 stopped at $0.41 against the $0.32 cap.
+    - Run 2 ran after fixing three bugs: the call that crossed the cap was missing from the trace, research never received the SOP, and briefs claimed web sources they didn't use. With the scan cap raised to $0.75, it stopped at $0.78.
+    - Run 2's research made 15 searches for $0.45. It wrote a real, honestly sourced brief, concluded that no candidate had a strong demand signal, and asked for a narrower scope. Opus then asked for a rework, and the rework crossed the cap.
+    - Ollama/Mistral on the same request passed the keyword evals with invented demand signals.
+  - **Next:** rerun with a narrowed category.
+  - **Gaps found:** the reviewer's feedback isn't traced. An agent can't escalate "too vague" mid-step; it can only write a brief that then goes to review.
 - [ ] 💳 The PRD's actual **P0 exit bar** is unmet: "10 real jobs, ≤2 owner touches each, zero ungated actions, cost in class" — needs real models + a real business + real volume. The machine is done; the *proving* isn't.
 
 ### Free, buildable now (P1 remainder / polish)
