@@ -48,8 +48,13 @@ HuggingFace. What's left:
     - Run 2 ran after fixing three bugs: the call that crossed the cap was missing from the trace, research never received the SOP, and briefs claimed web sources they didn't use. With the scan cap raised to $0.75, it stopped at $0.78.
     - Run 2's research made 15 searches for $0.45. It wrote a real, honestly sourced brief, concluded that no candidate had a strong demand signal, and asked for a narrower scope. Opus then asked for a rework, and the rework crossed the cap.
     - Ollama/Mistral on the same request passed the keyword evals with invented demand signals.
-  - **Next:** rerun with a narrowed category.
-  - **Gaps found:** the reviewer's feedback isn't traced. An agent can't escalate "too vague" mid-step; it can only write a brief that then goes to review.
+  - **Hobby-tools scan, 2026-11-17 (job_69a486d54569):**
+    - Research made 14 searches for $0.37 and wrote a good brief. Three candidates: a local-network companion for Bambu Lab 3D printers, a PDF sewing-pattern library, and a pay-once knit counter.
+    - It still escalated, at $0.99. The cause: **review showed Opus only the first 4,000 characters** of the 11.7k-character brief. Opus called it "cut off" and sent it back, and the rework crossed the cap. Run 2's rework had the same cause.
+    - **Fixed:** the reviewer now sees up to 40k characters, with an explicit note if anything is ever cut, and the trace records the reviewer's feedback.
+  - **Next:** rerun the hobby-tools scan once the daily cap resets. Without a false rework, a scan should cost about $0.55.
+  - **Gap:** an agent can't escalate "too vague" mid-step; it can only write a brief that then goes to review.
+  - **Gap:** the daily brake only checks at job start, so a job started at $0.99 can still spend its full $0.75 per-job cap.
 - [ ] 💳 The PRD's actual **P0 exit bar** is unmet: "10 real jobs, ≤2 owner touches each, zero ungated actions, cost in class" — needs real models + a real business + real volume. The machine is done; the *proving* isn't.
 
 ### Free, buildable now (P1 remainder / polish)

@@ -65,6 +65,45 @@ def test_revise_triggers_rework_then_passes(tmp_path):
     # the specialist actually saw the feedback
     rework_prompts = [p for _, p in model.calls if "Reviewer feedback" in p]
     assert any("per-sq-yd pricing" in p for p in rework_prompts)
+    # ...and the owner can see why the rework happened (it costs a full call)
+    revise = [e for e in rt.trace.read(job.id)
+              if e["type"] == "review" and e["payload"]["verdict"] == "revise"]
+    assert "per-sq-yd pricing" in revise[0]["payload"]["feedback"]
+
+
+def test_reviewer_sees_a_whole_live_size_brief(tmp_path):
+    """2026-11-17: an ~11.7k-character scan brief was cut to 4k for review, the
+    reviewer called it unfinished, and the needless rework blew the job cap."""
+    from hive.agents.coordinator import _review_excerpt
+
+    brief = "candidate details. " * 600 + "THE END OF THE BRIEF"  # about 11.4k characters
+    assert _review_excerpt(brief) == brief
+
+
+def test_overlong_output_is_marked_as_cut_for_the_reviewer():
+    from hive.agents.coordinator import _REVIEW_MAX_CHARS, _review_excerpt
+
+    shown = _review_excerpt("x" * (_REVIEW_MAX_CHARS + 500))
+    assert shown.startswith("x" * _REVIEW_MAX_CHARS)
+    assert "do not treat this cut as missing" in shown
+
+
+def test_review_prompt_carries_the_full_output(tmp_path):
+    model = ScriptedReviewClient([])
+    rt = make_runtime(tmp_path, model)
+    long_body = "section " * 1500 + "FINAL-SECTION-MARKER"   # about 12k characters
+    original = model.complete
+
+    def complete(tier, system, prompt, tools=None):
+        response = original(tier, system, prompt, tools)
+        if not prompt.startswith(REVIEW_PROMPT_PREFIX) and tier == "specialist":
+            return response.model_copy(update={"text": long_body})
+        return response
+
+    model.complete = complete
+    rt.trigger(lead())
+    reviews = [p for _, p in model.calls if p.startswith(REVIEW_PROMPT_PREFIX)]
+    assert reviews and all("FINAL-SECTION-MARKER" in p for p in reviews)
 
 
 def test_exhausted_reworks_escalate_never_accept(tmp_path):

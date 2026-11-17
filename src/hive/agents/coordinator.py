@@ -49,6 +49,26 @@ class DecisionRefused(Exception):
     consequential action must run at most once, and never while paused."""
 
 
+_REVIEW_FEEDBACK_TRACE_CHARS = 2000  # enough for actionable feedback; keeps traces small
+
+# How much of an output the reviewer sees. Live market-scan briefs run to about
+# 12k characters; the old 4k cut made the reviewer judge a half-brief as
+# "cut off" and send it back, and the needless rework blew the job cap
+# (2026-11-17). 40k characters is about 10k tokens, a few cents on Opus.
+_REVIEW_MAX_CHARS = 40_000
+
+
+def _review_excerpt(content: str) -> str:
+    """The output as the reviewer sees it. If it ever has to be shortened,
+    say so plainly, so the cut is never mistaken for an unfinished output."""
+    if len(content) <= _REVIEW_MAX_CHARS:
+        return content
+    return (content[:_REVIEW_MAX_CHARS]
+            + f"\n\n[HIVE note: only the first {_REVIEW_MAX_CHARS:,} of {len(content):,} "
+            "characters are shown. The output itself is longer; do not treat this cut "
+            "as missing or unfinished content.]")
+
+
 def _parse_verdict(text: str) -> tuple[str, str]:
     """Extract 'pass' | 'revise' | 'unparsed' from a review reply."""
     for line in text.splitlines():
@@ -324,7 +344,7 @@ class Coordinator(Agent):
                 f"{REVIEW_PROMPT_PREFIX}\n"
                 f"Step: {sop_step.id} (action: {sop_step.action}, agent: {sop_step.agent})\n"
                 f"Done when: {sop_step.done_when or 'no explicit criterion — judge fitness for purpose'}\n\n"
-                f"Output to review:\n{_artifact_content(artifact)[:4000]}\n\n"
+                f"Output to review:\n{_review_excerpt(_artifact_content(artifact))}\n\n"
                 'Reply starting with exactly "VERDICT: pass" or "VERDICT: revise". '
                 "If revise, follow with concrete, actionable feedback the specialist "
                 "can apply — name what is missing or wrong, not just that it is."
@@ -333,9 +353,12 @@ class Coordinator(Agent):
         finally:
             ctx.tools = saved_tools
         verdict, feedback = _parse_verdict(response.text)
+        # The reviewer's reasoning goes on the record: a revise round costs a
+        # whole specialist call, so the owner must be able to see why.
         self.trace.record(ctx.job_id, "review", agent=self.name,
                           payload={"step": sop_step.id, "verdict": verdict,
-                                   "artifact": artifact.id})
+                                   "artifact": artifact.id,
+                                   "feedback": feedback[:_REVIEW_FEEDBACK_TRACE_CHARS]})
         if verdict == "unparsed":
             return "pass", response.text  # fail-open, already traced as unparsed
         return verdict, feedback
