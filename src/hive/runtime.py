@@ -29,6 +29,7 @@ class Runtime:
         self.store = JobStore(self.config.db_path)
         self.trace = TraceWriter(self.config.trace_dir)
         self.vault = Vault(self.config.vault_dir)  # semantic memory (Obsidian-compatible)
+        self.vault.ensure_layout()  # raw/ wiki/ outputs/ + map; never overwrites
         self.kill_switch = KillSwitch()
         self.model: ModelClient = model or self._make_model()
         from hive.actions.email import make_email_sender
@@ -43,6 +44,7 @@ class Runtime:
             model=self.model,
             kill_switch=self.kill_switch,
             email_sender=self.email_sender,
+            vault=self.vault,
         )
         self.bus = EventBus()
         for sop in self.adapter.workflows.values():

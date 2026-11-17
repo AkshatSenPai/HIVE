@@ -54,11 +54,16 @@ HuggingFace. What's left:
     - **Fixed:** the reviewer now sees up to 40k characters, with an explicit note if anything is ever cut, and the trace records the reviewer's feedback.
   - **Next:** rerun the hobby-tools scan once the daily cap resets. Without a false rework, a scan should cost about $0.55.
   - **Gap:** an agent can't escalate "too vague" mid-step; it can only write a brief that then goes to review.
-  - **Gap:** the daily brake only checks at job start, so a job started at $0.99 can still spend its full $0.75 per-job cap.
+  - ~~**Gap:** the daily brake only checks at job start~~ Fixed 2026-11-17: a job can spend only what's left of the day.
 - [ ] 💳 The PRD's actual **P0 exit bar** is unmet: "10 real jobs, ≤2 owner touches each, zero ungated actions, cost in class" — needs real models + a real business + real volume. The machine is done; the *proving* isn't.
 
 ### Free, buildable now (P1 remainder / polish)
-- [ ] 🟢 **`vault_read` as a real tool** — agents are *granted* it but it's a no-op today; wiring it lets agents read the Obsidian/semantic vault for context (makes them smarter, free). Highest-value free item.
+- [x] 🟢 **`vault_read` made real (2026-11-17).**
+  - HIVE lays out `raw/`, `wiki/`, `outputs/` and a `CLAUDE.md` map in its own folder inside the owner's Obsidian vault (`HIVE_VAULT_DIR=…\ZenithVault\HIVE`).
+  - Steps list `reads:`. HIVE puts the map and those notes, fenced, into the agent's prompt, on every backend.
+  - Approved work is filed to `outputs/<workflow>/`.
+  - Market scans now read past scans.
+- [x] 🟢 **Daily cap is a hard ceiling per job (2026-11-17).** A job can spend only what's left of the day's budget.
 - [ ] 🟢 **Async job queue / worker split** — jobs currently run inline on the producing thread; a slow live-model job blocks its producer. Matters once on real models.
 - [ ] 🟢 **Coordinator real planning** — today it maps the SOP 1:1; genuine decomposition is the PRD's "make-or-break," but can only be *evaluated* with real models (pair with the live run).
 - [ ] 🟢 **Telegram approval-card push** (not just the daily digest) — approve from your phone.

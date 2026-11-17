@@ -24,6 +24,9 @@ class SOPStep(BaseModel):
     output: str = ""
     checkpoint: bool = False
     done_when: str = ""
+    # Vault notes this step's agent reads (files or folders inside HIVE's vault
+    # folder). Used only if the adapter grants that agent vault_read.
+    reads: list[str] = Field(default_factory=list)
 
 
 class SOP(BaseModel):

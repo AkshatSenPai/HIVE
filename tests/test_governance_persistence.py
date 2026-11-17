@@ -50,3 +50,29 @@ def test_global_daily_cap_blocks_new_jobs(tmp_path):
     assert "global daily budget exhausted" in job2.error
     assert len(rt.model.calls) == calls_before  # zero tokens spent on the refusal
     assert rt.coordinator.escalations.pending()
+
+
+def test_job_cannot_spend_past_what_is_left_of_the_day(tmp_path):
+    """A job may start with a little of the day left, but only spend that little
+    (before: it got its whole per-job cap on top of the day's spend)."""
+    rt = Runtime(HiveConfig(adapter_dir=EXAMPLE_ADAPTER, data_dir=tmp_path / ".hive"),
+                 model=StubModelClient())
+    job1 = rt.trigger(lead("first"))
+    left = job1.spend_usd * 0.4  # room for about one model call, not a whole job
+    rt.adapter.policies["budgets"]["global_daily"] = {"max_usd": job1.spend_usd + left}
+
+    job2 = rt.trigger(lead("second"))
+    assert job2.state is JobState.ESCALATED
+    assert job2.spend_usd < job1.spend_usd  # stopped early, not a full job's worth
+    limited = [e for e in rt.trace.read(job2.id) if e["type"] == "budget_limited"]
+    assert limited and limited[0]["payload"]["daily_left_usd"] == round(left, 4)
+    question = rt.coordinator.escalations.pending()[-1].question
+    assert "what was left of today's" in question and "rerun it tomorrow" in question
+
+
+def test_plenty_left_today_keeps_the_per_job_cap(tmp_path):
+    rt = Runtime(HiveConfig(adapter_dir=EXAMPLE_ADAPTER, data_dir=tmp_path / ".hive"),
+                 model=StubModelClient())
+    job = rt.trigger(lead())
+    assert job.state is JobState.AWAITING_APPROVAL
+    assert "budget_limited" not in [e["type"] for e in rt.trace.read(job.id)]

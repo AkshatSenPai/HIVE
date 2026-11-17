@@ -174,7 +174,7 @@ tests/                  # FSM, budgets, gates, fencing, adapter, pipeline, API
 |-------------------|-------------------------------------------|--------------------|
 | `HIVE_ADAPTER_DIR`| which business adapter to mount           | `adapters/example` |
 | `HIVE_DATA_DIR`   | where jobs DB / traces / vault live       | `.hive/`           |
-| `HIVE_VAULT_DIR`  | point semantic memory at an existing Obsidian vault | `.hive/vault` |
+| `HIVE_VAULT_DIR`  | HIVE's folder inside your Obsidian vault (e.g. `C:\Users\you\ZenithVault\HIVE`); HIVE lays out `raw/` `wiki/` `outputs/` + a `CLAUDE.md` map there and never reads or writes outside it | `.hive/vault` |
 | `HIVE_WEB_DIR`    | where the frontend pages live             | `web/`             |
 | `HIVE_MODEL_BACKEND` | `stub` (canned, $0) · `ollama` (local models, $0) · `claude_code` (real Claude models on your Claude plan) · `anthropic` (live API, paid) | `stub` |
 | `HIVE_OLLAMA_MODEL` | local model when backend is `ollama`    | `mistral:7b-instruct-q4_K_M` |

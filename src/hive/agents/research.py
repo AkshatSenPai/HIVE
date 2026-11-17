@@ -39,6 +39,9 @@ class ResearchAgent(Agent):
             step = task.get("step")
             which = f" Do the '{step}' step." if step else ""
             prompt += f"\n\nSOP instructions.{which}\n{instructions}"
+        if vault_context := task.get("vault_context"):
+            # Built by the coordinator: the map plus the step's notes, each fenced.
+            prompt += f"\n\nFrom the vault:\n{vault_context}"
         if raw_context:
             # Trigger payloads come from the outside world — always fenced.
             prompt += "\n\n" + fence(raw_context, source=task.get("source", "trigger"))

@@ -26,6 +26,9 @@ class MakerAgent(Agent):
         prompt = f"Produce a {kind}.\n\nSOP instructions:\n{instructions}"
         if brief is not None:
             prompt += f"\n\nResearch brief:\n{brief.summary}"
+        if vault_context := task.get("vault_context"):
+            # Built by the coordinator: the map plus the step's notes, each fenced.
+            prompt += f"\n\nFrom the vault:\n{vault_context}"
         if feedback := task.get("feedback"):
             # Coordinator review feedback (internal, trusted — not fenced).
             prompt += f"\n\nReviewer feedback on your previous attempt — address all of it:\n{feedback}"

@@ -44,7 +44,7 @@ Event ──▶ EventBus ──▶ Coordinator ──▶ Job (FSM, SQLite)
 | Gates (§11.1) | `policy/gates.py` | send/spend/publish/contract/live_settings; **spend never opens** |
 | Budgets + kill switch (§10, §11.7) | `policy/budgets.py` | steps/tokens/$ caps, pause-and-escalate, global switch |
 | Injection fencing (§11.2) | `fencing.py` | wraps all trigger payloads before prompts; escape attempts neutralized |
-| Memory fabric (§4) | `memory/` | semantic vault (path-safe), episodic queries over jobs DB, procedural SOP loader |
+| Memory fabric (§4) | `memory/` | semantic vault (path-safe; lays out `raw/` `wiki/` `outputs/` + a `CLAUDE.md` map, never overwriting; owner's setup: `ZenithVault/HIVE`), vault context for steps' `reads:` + filing approved work (`vault_context.py`), episodic queries over jobs DB, procedural SOP loader |
 | Multi-model routing (§9) | `agents/model.py` | tiers: planner → Opus 5.5, specialist → Sonnet 5.5, extractor → Haiku 5.5, frontier → Fable 5.2 (owner-gated); adaptive thinking on, effort set per tier. Four backends: `stub` ($0, canned), `ollama` ($0, real local inference — dev/free tier; no server-side tools), `claude_code` (real Claude models through the `claude` CLI on the owner's Claude plan — headless `--safe-mode`, granted tools only, API keys stripped; spend = Claude Code's API-equivalent cost), `anthropic` (live API, paid). `claude_code` and `anthropic` share routing and effort, so plan → API is one setting. A backend that can't run the call (CLI missing, plan limit, timeout) raises `ModelUnavailable` → the job escalates (`model_unavailable`) |
 | Action layer (§4) | `actions/registry.py` | server-side tools only for P0 — `web_search` (Anthropic-hosted, max_uses-capped); least privilege enforced at the agent chokepoint |
 | Owner voice (§3, P4 pulled fwd) | `voice/backends.py` + `api` `/voice/*` `/brief` + `web/hive-voice.js` | hands-free owner channel: Whisper STT + Kokoro TTS behind a `stub`/`local` backend (mirrors model backends); floating browser widget (push-to-talk, intent routing, approval-review with read-back+confirm). Agent phone-calls still deferred. Spec: `docs/superpowers/specs/2026-07-08-hive-voice-design.md`. Hardened via an adversarial review (see below). |
@@ -162,9 +162,17 @@ unauthenticated by design. Revisit if HIVE ever becomes multi-user/hosted.
    Maker produces schema'd artifacts via LLM. **Still never exercised against
    the live API** — first `HIVE_USE_LLM=1` run may need a tweak.
 7. **Action layer is server-side-only.** `web_search` works through the model
-   call itself; client-side tools (vault read/write, email send, browser)
-   need a tool-use execution loop that doesn't exist yet. `vault_read` is
-   granted in tools.yaml but is a no-op today.
+   call itself. A browser agent needs a tool-use execution loop that doesn't
+   exist yet.
+   - `vault_read` (2026-11-17) is not a model tool. A step lists notes
+     (`reads:` in the SOP), and HIVE builds the prompt section itself
+     (`memory/vault_context.py`): the map, then each note fenced, newest
+     first, at most 30k characters in total and 8k per note. It only runs
+     for agents granted `vault_read`, works on every backend, and the
+     result is traced as `vault_read`.
+   - Approved work is filed to `outputs/<workflow>/<date>-<job>.md` (traced
+     `output_filed` / `output_not_filed`).
+   - Email send runs at the approval gate.
 
 ## The venture-studio arc (owner's primary use case)
 

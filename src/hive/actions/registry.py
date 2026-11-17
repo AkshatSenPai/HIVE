@@ -2,8 +2,10 @@
 
 P0 scope: **server-side tools only** — capabilities Anthropic's infrastructure
 executes during a model call (web search). They need no client-side execution
-loop, which keeps the P0 agent body simple. Client-side tools (vault read,
-email send, browser agent) land here later with a proper tool-use loop.
+loop, which keeps the P0 agent body simple. `vault_read` is not a model tool:
+HIVE reads the notes a step lists and puts them in the prompt itself
+(memory/vault_context.py), on every backend. Email send runs at the approval
+gate; a browser agent lands later with a proper tool-use loop.
 
 Tool names are HIVE-internal. Adapters grant them per agent in tools.yaml;
 the Agent base enforces that an agent can only request granted tools.
@@ -34,7 +36,7 @@ class ToolNotPermitted(Exception):
 def anthropic_tool_defs(names: list[str]) -> list[dict[str, Any]]:
     """Map granted HIVE tool names to API tool definitions.
 
-    Names without a server-side spec (e.g. vault_read, which is a future
-    client-side tool) are skipped — granting them is harmless today.
+    Names without a server-side spec are skipped. vault_read is one: HIVE
+    serves it as prompt context, so it never reaches the API as a tool.
     """
     return [dict(spec) for name in names if (spec := ANTHROPIC_SERVER_TOOLS.get(name))]

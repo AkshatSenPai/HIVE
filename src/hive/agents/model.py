@@ -257,7 +257,8 @@ def _claude_code_usage(data: dict) -> tuple[int, int, int]:
 
 # HIVE tool name -> Claude Code built-in tool. Only tools listed here can ever
 # be switched on for a headless call; everything else stays off (PRD §11.3).
-# vault_read has no Claude Code equivalent yet, so granting it enables nothing.
+# vault_read isn't a model tool: HIVE puts the step's vault notes in the prompt
+# itself, so granting it never switches on a Claude Code tool.
 CLAUDE_CODE_TOOLS: dict[str, str] = {"web_search": "WebSearch"}
 
 # Environment variables that would make the `claude` CLI bill an API key

@@ -26,6 +26,8 @@ from hive.jobs.fsm import transition
 from hive.jobs.models import Job, JobState
 from hive.jobs.store import JobStore
 from hive.memory.procedural import SOP
+from hive.memory.semantic import Vault
+from hive.memory.vault_context import build_vault_context, output_note
 from hive.observability.trace import TraceWriter
 from hive.policy.autonomy import AutonomyDial
 from hive.policy.budgets import Budget, BudgetExceeded, KillSwitch
@@ -111,8 +113,10 @@ class Coordinator(Agent):
         gate: PolicyGate | None = None,
         escalations: EscalationQueue | None = None,
         email_sender=None,  # EmailSender protocol; None => sends fail loudly
+        vault: Vault | None = None,  # semantic memory; None => no vault reads or filing
     ) -> None:
         self.email_sender = email_sender
+        self.vault = vault
         self.adapter = adapter
         self.store = store
         self.trace = trace
@@ -155,8 +159,10 @@ class Coordinator(Agent):
         # Global daily brake (PRD §10): if the day's spend already hit the cap,
         # refuse to start — escalate to the owner instead of quietly queuing.
         daily_cap = self.adapter.policies.get("budgets", {}).get("global_daily", {}).get("max_usd")
+        daily_left: float | None = None
         if daily_cap is not None:
             spent_today = self.store.spend_on(datetime.now(timezone.utc).date())
+            daily_left = daily_cap - spent_today
             if spent_today >= daily_cap:
                 transition(job, JobState.ESCALATED)
                 job.error = f"global daily budget exhausted: ${spent_today:.4f} >= ${daily_cap}"
@@ -172,6 +178,15 @@ class Coordinator(Agent):
                 return job
 
         budget = self._job_budget(sop)
+        # What's left of the day is a hard ceiling too. Without it a job that
+        # starts at $0.99 of a $1 day could still spend its whole per-job cap.
+        day_limited = daily_left is not None and daily_left < budget.max_usd
+        if day_limited:
+            self.trace.record(job.id, "budget_limited", agent=self.name,
+                              payload={"per_job_usd": budget.max_usd,
+                                       "daily_cap_usd": daily_cap,
+                                       "daily_left_usd": round(daily_left, 4)})
+            budget.max_usd = daily_left
         ctx = AgentContext(
             job_id=job.id, model=self.model, budget=budget,
             kill_switch=self.kill_switch, trace=self.trace,
@@ -191,9 +206,14 @@ class Coordinator(Agent):
         except BudgetExceeded as exc:
             transition(job, JobState.ESCALATED)
             job.error = str(exc)
+            if day_limited and exc.what == "usd":
+                question = (f"Job {job.id} used what was left of today's ${daily_cap} cap "
+                            f"(${daily_left:.4f}; this job spent ${exc.spent}). "
+                            "Raise the daily cap in policies.yaml, or rerun it tomorrow?")
+            else:
+                question = f"Job {job.id} hit its budget cap: {exc}. Raise cap, or cancel?"
             self.escalations.raise_escalation(
-                self.escalate(ctx, reason=EscalationReason.BUDGET_EDGE,
-                              question=f"Job {job.id} hit its budget cap: {exc}. Raise cap, or cancel?")
+                self.escalate(ctx, reason=EscalationReason.BUDGET_EDGE, question=question)
             )
         except ReviewFailed as exc:
             transition(job, JobState.ESCALATED)
@@ -303,6 +323,8 @@ class Coordinator(Agent):
             for name in sop_step.inputs:
                 if name in outputs:
                     task[name] = outputs[name]
+            if vault_text := self._vault_context(job, sop_step, grants):
+                task["vault_context"] = vault_text
             artifact = agent.perform(ctx, task)
             self._keep(job, artifact)
 
@@ -330,6 +352,18 @@ class Coordinator(Agent):
                               payload={"step": sop_step.id, "artifact": artifact.id})
         ctx.tools = []  # don't leak the last specialist's grants forward
         return outputs
+
+    def _vault_context(self, job: Job, sop_step, grants: list[str]) -> str:
+        """The vault notes this step lists, for an agent granted vault_read.
+        HIVE does the reading (every backend, never outside the vault root);
+        what was included or skipped is traced."""
+        if self.vault is None or not sop_step.reads or "vault_read" not in grants:
+            return ""
+        context = build_vault_context(self.vault, sop_step.reads)
+        self.trace.record(job.id, "vault_read", agent=self.name,
+                          payload={"step": sop_step.id, "included": context.included,
+                                   "skipped": context.skipped})
+        return context.text
 
     def _review(self, ctx: AgentContext, sop_step, artifact: Artifact) -> tuple[str, str]:
         """One review round. Returns (verdict, feedback). Unparseable replies
@@ -460,6 +494,7 @@ class Coordinator(Agent):
                     self.store.save_job(job)
                     return job
             transition(job, JobState.DONE)
+            self._file_output(job, card, status)
             if status is ApprovalStatus.APPROVED:
                 if self.gate.dial.record_approval(card.step_key):
                     self.trace.record(job.id, "autonomy_upgrade_proposed", agent=self.name,
@@ -474,6 +509,29 @@ class Coordinator(Agent):
         self.trace.record(job.id, "approval_decided", agent=self.name,
                           payload={"card": card.id, "status": status.value})
         return job
+
+    def _file_output(self, job: Job, card: ApprovalCard, status: ApprovalStatus) -> None:
+        """File the approved job's latest Draft into the vault's outputs/.
+        Best effort: a filing problem is traced, never undoes the decision."""
+        if self.vault is None:
+            return
+        drafts = [a for a in self.store.list_artifacts(job.id) if a["artifact_type"] == "Draft"]
+        if not drafts:
+            self.trace.record(job.id, "output_not_filed", agent=self.name,
+                              payload={"reason": "job produced no Draft"})
+            return
+        decided_at = (card.decided_at or datetime.now(timezone.utc)).astimezone()
+        path, content = output_note(job, drafts[-1]["body"], status.value, decided_at)
+        try:
+            self.vault.write_new(path, content)
+        except FileExistsError:
+            self.trace.record(job.id, "output_not_filed", agent=self.name,
+                              payload={"reason": f"{path} already exists; not overwritten"})
+        except OSError as exc:
+            self.trace.record(job.id, "output_not_filed", agent=self.name,
+                              payload={"reason": f"{type(exc).__name__}: {exc}"})
+        else:
+            self.trace.record(job.id, "output_filed", agent=self.name, payload={"path": path})
 
     def _execute_send(self, job: Job, subject: str) -> str:
         """The actual consequential action. Composes the email from persisted

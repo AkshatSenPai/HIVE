@@ -122,7 +122,7 @@ def test_vault_endpoints(tmp_path):
     c = TestClient(create_app(runtime))
 
     files = c.get("/vault").json()["files"]
-    assert files == ["clients/acme.md"]
+    assert files == ["CLAUDE.md", "clients/acme.md"]  # the map HIVE lays out, plus the note
     body = c.get("/vault/file", params={"path": "clients/acme.md"}).json()
     assert "notes here" in body["content"]
     assert c.get("/vault/file", params={"path": "missing.md"}).status_code == 404

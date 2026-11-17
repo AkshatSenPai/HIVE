@@ -14,6 +14,7 @@ steps:
     action: scan_market
     action_kind: internal
     inputs: []
+    reads: [outputs/market_scan]   # past approved scans, so a new scan doesn't repeat old leads
     output: brief
     done_when: "Brief lists candidate opportunities, each with a demand signal and a rough effort guess."
   - id: shortlist
